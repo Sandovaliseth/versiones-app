@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./../backend/versions-backend
+    container_name: versiones-backend
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build: ./../frontend
+    container_name: versiones-frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-versiones
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASS}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+    volumes:
+      - ./n8n_data:/home/node/.n8n

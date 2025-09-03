@@ -1,0 +1,18 @@
+# Java
+backend/target/
+backend/.idea/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# n8n
+infra/n8n_data/
+infra/.env
+
+# Python
+__pycache__/
+
+# Otros
+*.log
+*.bak

@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: local
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:sqlite:./data/versiones.db
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    open-in-view: false
+  flyway:
+    enabled: true
+management:
+  endpoints.web.exposure.include: health,info
