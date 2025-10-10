@@ -1,0 +1,110 @@
+# 📦 Configuración de Electron Builder
+# Configuración para empaquetar la aplicación como ejecutable de escritorio
+
+appId: com.lis.versiones.app
+productName: Gestor de Versiones
+copyright: Copyright © 2025 LIS - Sistema de Gestión de Versiones
+
+# Directorios
+directories:
+  buildResources: electron
+  output: dist-electron
+
+# Archivos a incluir en el build
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+
+# Compresión para reducir tamaño del ejecutable
+compression: maximum
+
+# Configuración para Windows (.exe)
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: electron/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+# Instalador NSIS para Windows
+nsis:
+  oneClick: false                    # Permitir instalación personalizada
+  allowToChangeInstallationDirectory: true
+  perMachine: false                   # Instalación por usuario (no requiere admin)
+  createDesktopShortcut: true         # Crear acceso directo en escritorio
+  createStartMenuShortcut: true       # Crear acceso directo en menú inicio
+  shortcutName: Gestor de Versiones
+  installerIcon: electron/icon.ico
+  uninstallerIcon: electron/icon.ico
+  installerHeaderIcon: electron/icon.ico
+  deleteAppDataOnUninstall: true      # Limpiar datos al desinstalar
+  runAfterFinish: true                # Ejecutar app después de instalar
+
+# Configuración para macOS (.dmg, .app)
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: electron/icon.icns
+  category: public.app-category.productivity
+  artifactName: ${productName}-${version}.${ext}
+  darkModeSupport: true
+
+# Configuración de DMG para macOS
+dmg:
+  title: ${productName} ${version}
+  icon: electron/icon.icns
+  backgroundColor: '#ffffff'
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 140
+      y: 150
+      type: file
+    - x: 400
+      y: 150
+      type: link
+      path: /Applications
+
+# Configuración para Linux (.AppImage, .deb, .rpm)
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  icon: electron/icon.png
+  category: Office
+  synopsis: Sistema de Gestión de Versiones
+  description: Aplicación profesional para gestionar versiones de software con interfaz moderna
+  artifactName: ${productName}-${version}.${ext}
+
+# Configuración de .deb para Debian/Ubuntu
+deb:
+  packageCategory: utils
+  priority: optional
+
+# Configuración de .rpm para Fedora/RHEL/CentOS
+rpm:
+  packageCategory: Applications/Productivity
+
+# Auto-update (opcional - deshabilitado por ahora)
+publish: null
+
+# Configuración de metadatos
+extraMetadata:
+  main: electron/main.js
+  name: gestor-versiones
+  version: 1.0.0
+  description: Sistema profesional de gestión de versiones con diseño moderno UX/UI 2025
+  author:
+    name: LIS
+    email: soporte@lis.com
+  homepage: https://lis.com
