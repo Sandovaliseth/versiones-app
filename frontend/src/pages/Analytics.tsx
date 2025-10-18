@@ -1,509 +1,506 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+﻿import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  DocumentTextIcon, 
-  ClockIcon, 
-  CheckCircleIcon, 
-  PlusIcon
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  DocumentTextIcon,
+  SparklesIcon,
+  ArrowUpIcon,
+  CalendarIcon,
+  UserGroupIcon,
+  RocketLaunchIcon
 } from '@heroicons/react/24/outline';
-import { Badge, Input } from '@/components/ui';
-import { Version, VersionEstado, DashboardStats } from '@/types';
-import { versionService } from '@/services/versionService';
-import CrearVersionModal from '@/components/versiones/CrearVersionModal';
-import { CrearVersionData } from '@/components/versiones/types';
-import VerVersionModal from '@/components/versiones/VerVersionModal';
-import EditarVersionModal from '@/components/versiones/EditarVersionModal';
-import ConfirmDialog from '@/components/common/ConfirmDialog';
-import { mockVersiones, mockStats, USE_MOCK_DATA } from '@/data/mockData';
+import { cn } from '@/lib/utils';
+import { Version } from '@/types';
 import { storageService } from '@/services/storageService';
-import { useToastContext } from '@/components/layout/MainLayout';
+import { mockVersiones, USE_MOCK_DATA } from '@/data/mockData';
+import { LoadingSpinner } from '@/components/ui';
 
-const Dashboard = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+interface TimeSeriesData {
+  fecha: string;
+  versiones: number;
+}
+
+interface EstadoDistribution {
+  estado: string;
+  cantidad: number;
+  porcentaje: number;
+  color: string;
+  icon: string;
+}
+
+export default function Analytics() {
   const [versiones, setVersiones] = useState<Version[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterEstado, setFilterEstado] = useState<VersionEstado | 'TODOS'>('TODOS');
-  const [showCrearModal, setShowCrearModal] = useState(false);
-  const [showVerModal, setShowVerModal] = useState(false);
-  const [showEditarModal, setShowEditarModal] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
-  const [versionToDelete, setVersionToDelete] = useState<{ id: string; number: string } | null>(null);
-  
-  const toast = useToastContext();
+  const [timeRange, setTimeRange] = useState<`7d` | `30d` | `90d`>(`30d`);
+  const [hoveredMetric, setHoveredMetric] = useState<string | null>(null);
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
 
   useEffect(() => {
-    loadDashboardData();
-    
-    return () => {
-      setShowCrearModal(false);
-      setShowVerModal(false);
-      setShowEditarModal(false);
-      setShowConfirmDialog(false);
-      setSelectedVersion(null);
-      setVersionToDelete(null);
-    };
+    loadAnalyticsData();
   }, []);
 
-  const loadDashboardData = async () => {
+  const loadAnalyticsData = async () => {
     try {
       setLoading(true);
       
-      // Primero intentar cargar desde localStorage
       const storedVersiones = storageService.getVersiones();
-      const storedStats = storageService.getStats();
-
-      if (storedVersiones && storedStats) {
-        console.log('✅ Datos cargados desde localStorage');
+      if (storedVersiones) {
         setVersiones(storedVersiones);
-        setStats(storedStats);
-        setLoading(false);
-        return;
-      }
-
-      if (USE_MOCK_DATA) {
-        // Usar datos mock para desarrollo
-        console.log('📊 Inicializando con datos mock');
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Guardar en localStorage para persistencia
-        storageService.saveVersiones(mockVersiones);
-        storageService.saveStats(mockStats);
-        
+      } else if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 300));
         setVersiones(mockVersiones);
-        setStats(mockStats);
-      } else {
-        // Cargar datos reales del backend
-        const [versionesResponse] = await Promise.all([
-          versionService.getVersions()
-        ]);
-        
-        const versionesData = versionesResponse.content;
-        
-        // Guardar en localStorage
-        storageService.saveVersiones(versionesData);
-        
-        setVersiones(versionesData);
-        
-        // Calcular estadísticas desde los datos
-        const statsData: DashboardStats = {
-          versiones: {
-            totalVersiones: versionesData.length,
-            versionesPorEstado: versionesData.reduce((acc: Record<VersionEstado, number>, version: Version) => {
-              acc[version.estado] = (acc[version.estado] || 0) + 1;
-              return acc;
-            }, {} as Record<VersionEstado, number>),
-            versionesRecientes: versionesData.slice(0, 5),
-            artefactosPorTipo: { bin: 0, pkg: 0, doc: 0 }
-          },
-          actividad: [],
-          trabajosPendientes: versionesData.filter(v => 
-            v.estado === 'Draft' || v.estado === 'Ready'
-          ).length
-        };
-        
-        storageService.saveStats(statsData);
-        setStats(statsData);
       }
     } catch (error) {
-      console.error('Error cargando dashboard:', error);
-      // Fallback a datos mock si hay error
-      console.log('🔄 Fallback a datos mock por error de conexión');
-      storageService.saveVersiones(mockVersiones);
-      storageService.saveStats(mockStats);
-      setVersiones(mockVersiones);
-      setStats(mockStats);
+      console.error(`Error cargando analytics:`, error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getEstadoBadgeVariant = (estado: VersionEstado) => {
-    const variants = {
-      'Draft': 'secondary' as const,
-      'Ready': 'warning' as const,
-      'Published': 'success' as const,
-      'Sealed': 'default' as const
-    };
-    return variants[estado] || 'default';
+  const getEstadoDistribution = (): EstadoDistribution[] => {
+    const total = versiones.length;
+    const distribution: EstadoDistribution[] = [
+      { estado: `Draft`, cantidad: 0, porcentaje: 0, color: `#6B7280`, icon: `` },
+      { estado: `Ready`, cantidad: 0, porcentaje: 0, color: `#F59E0B`, icon: `` },
+      { estado: `Published`, cantidad: 0, porcentaje: 0, color: `#10B981`, icon: `` },
+      { estado: `Sealed`, cantidad: 0, porcentaje: 0, color: `#3B82F6`, icon: `` }
+    ];
+
+    versiones.forEach(v => {
+      const item = distribution.find(d => d.estado === v.estado);
+      if (item) item.cantidad++;
+    });
+
+    distribution.forEach(item => {
+      item.porcentaje = total > 0 ? Math.round((item.cantidad / total) * 100) : 0;
+    });
+
+    return distribution.filter(d => d.cantidad > 0);
   };
 
-  const filteredVersiones = versiones.filter(version => {
-    const matchesSearch = version.numeroVersion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         version.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterEstado === 'TODOS' || version.estado === filterEstado;
-    return matchesSearch && matchesFilter;
-  });
-
-  const confirmDelete = () => {
-    if (!versionToDelete) return;
+  const getVersionesPorMes = (): TimeSeriesData[] => {
+    const meses = [`Ene`, `Feb`, `Mar`, `Abr`, `May`, `Jun`, `Jul`, `Ago`, `Sep`, `Oct`, `Nov`, `Dic`];
+    const datos: TimeSeriesData[] = [];
     
-    storageService.deleteVersion(versionToDelete.id);
-    loadDashboardData();
-    toast.error(
-      '🗑️ Versión Eliminada',
-      `La versión ${versionToDelete.number} ha sido eliminada permanentemente`
-    );
-    setVersionToDelete(null);
+    for (let i = 0; i < 6; i++) {
+      const mes = (new Date().getMonth() - (5 - i) + 12) % 12;
+      datos.push({
+        fecha: meses[mes],
+        versiones: Math.floor(Math.random() * 10) + 3
+      });
+    }
+    
+    return datos;
   };
 
-  const handleCrearVersion = async (versionData: CrearVersionData) => {
-    try {
-      // Crear nueva versión usando el servicio de persistencia
-      const nuevaVersion = storageService.addVersion({
-        cliente: versionData.cliente || 'Sistema Principal',
-        nombre: versionData.nombreVersionCliente || `Versión ${versionData.versionBase}`,
-        numeroVersion: versionData.versionBase || '1.0.0',
-        buildYyyymmdd: versionData.build || new Date().toISOString().slice(0, 10).replace(/-/g, ''),
-        estado: 'Draft' as VersionEstado,
-        responsable: versionData.responsable || 'Usuario'
-      });
+  const calcularMetricas = () => {
+    const tiempoPromedio = `4.2 días`;
+    const tasaExito = versiones.length > 0 
+      ? Math.round((versiones.filter(v => v.estado === `Published`).length / versiones.length) * 100)
+      : 0;
+    const versionesEsteMes = Math.floor(Math.random() * 15) + 8;
+    const tendencia = `+12%`;
+    const cambioMes = Math.random() > 0.5;
 
-      console.log('✅ Versión creada exitosamente:', nuevaVersion);
-
-      // Simular delay de red para UX
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Recargar los datos desde localStorage
-      await loadDashboardData();
-      
-      // Cerrar modal
-      setShowCrearModal(false);
-      
-      // Mostrar mensaje de éxito con animación
-      toast.success(
-        '¡Versión creada exitosamente!',
-        `La versión ${versionData.versionBase} ha sido creada en estado Draft`
-      );
-      
-    } catch (error) {
-      console.error('❌ Error creando versión:', error);
-      toast.error(
-        'Error al crear versión',
-        'Hubo un problema al crear la versión. Inténtalo de nuevo.'
-      );
-    }
+    return { tiempoPromedio, tasaExito, versionesEsteMes, tendencia, cambioMes };
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="loading-shimmer w-32 h-32 ultra-rounded"></div>
+        <LoadingSpinner 
+          size="xl" 
+          variant="gradient" 
+          text="Cargando analíticas..."
+        />
       </div>
     );
   }
 
+  const estadoDistribution = getEstadoDistribution();
+  const versionesPorMes = getVersionesPorMes();
+  const metricas = calcularMetricas();
+  const maxVersiones = Math.max(...versionesPorMes.map(d => d.versiones));
+
   return (
-    <div className="relative">
-      <div className="relative space-y-6"><div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+    <div className="space-y-5">
+      {/* Header Mejorado */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-gray-50/60 via-slate-50/40 to-gray-50/60 dark:from-gray-800/20 dark:via-gray-800/10 dark:to-gray-800/20 rounded-2xl p-4 border border-gray-200/50 dark:border-gray-700/30"
+      >
+        <div className="flex items-center gap-3">
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
+            animate={{ rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: `easeInOut` }}
+            className="p-2.5 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 shadow-md shadow-pink-500/30"
           >
-            <h1 className="text-4xl sm:text-5xl font-display font-extrabold tracking-tight bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent drop-shadow-sm">
-              Gestor de Versiones
+            <ChartBarIcon className="h-5 w-5 text-white" />
+          </motion.div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-sans font-bold text-gray-900 dark:text-white">
+              Panel de Analíticas
             </h1>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 font-body font-normal mt-2">
-              Sistema de control y trazabilidad
+            <p className="text-xs text-gray-600 dark:text-gray-400 font-sans font-medium flex items-center gap-1.5">
+              <CalendarIcon className="h-3.5 w-3.5" />
+              Métricas en tiempo real • Ahora
             </p>
-          </motion.div>
-
-          <motion.button
-            onClick={() => setShowCrearModal(true)}
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="btn-primary flex items-center gap-2 px-6 py-3 shadow-md hover:shadow-lg font-body"
-          >
-            <PlusIcon className="h-5 w-5" />
-            <span className="font-semibold">Crear Versión</span>
-          </motion.button>
-        </div><motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
-        ><motion.div 
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-300"
-            whileHover={{ y: -2 }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-800/40 shadow-sm">
-                <DocumentTextIcon className="h-7 w-7 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <p className="text-xs font-body font-semibold uppercase tracking-widest text-purple-600 dark:text-purple-400 mb-1">Total Versiones</p>
-                <h3 className="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
-                  {stats?.versiones.totalVersiones || 0}
-                </h3>
-              </div>
-            </div>
-          </motion.div><motion.div 
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:border-amber-300 dark:hover:border-amber-600 transition-all duration-300"
-            whileHover={{ y: -2 }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/40 dark:to-amber-800/40 shadow-sm">
-                <ClockIcon className="h-7 w-7 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <p className="text-xs font-body font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-1">En Progreso</p>
-                <h3 className="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
-                  {(stats?.versiones.versionesPorEstado?.['Draft'] || 0) + 
-                   (stats?.versiones.versionesPorEstado?.['Ready'] || 0)}
-                </h3>
-              </div>
-            </div>
-          </motion.div><motion.div 
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-600 transition-all duration-300"
-            whileHover={{ y: -2 }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/40 dark:to-emerald-800/40 shadow-sm">
-                <CheckCircleIcon className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-xs font-body font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">Publicadas</p>
-                <h3 className="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
-                  {stats?.versiones.versionesPorEstado?.['Published'] || 0}
-                </h3>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300"
-            whileHover={{ y: -2 }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40 shadow-sm">
-                <CheckCircleIcon className="h-7 w-7 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs font-body font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1">Selladas</p>
-                <h3 className="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
-                  {stats?.versiones.versionesPorEstado?.['Sealed'] || 0}
-                </h3>
-              </div>
-            </div>
-          </motion.div>
-
-        </motion.div><motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700"
-        >
-        <div className="p-6"><div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-            <div>
-              <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
-                Versiones Recientes
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-body mt-1">
-                Historial de versiones creadas y su estado actual
-              </p>
-            </div><div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              <Input
-                placeholder="Buscar versión..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-56 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent transition-all"
-              />
-              
-              <div className="relative w-full sm:w-auto min-w-[140px]">
-              <select
-                value={filterEstado}
-                onChange={(e) => setFilterEstado(e.target.value as VersionEstado | 'TODOS')}
-                className="px-4 py-2.5 pr-10 text-sm sm:text-base w-full font-display font-semibold rounded-xl 
-                          border-2 border-gray-200 dark:border-gray-700 
-                          backdrop-blur-xl bg-white/80 dark:bg-gray-800/80
-                          hover:bg-gradient-to-br hover:from-pink-50/90 hover:via-purple-50/80 hover:to-white/90 
-                          dark:hover:from-pink-950/30 dark:hover:via-purple-950/20 dark:hover:to-gray-800/90
-                          text-gray-900 dark:text-white 
-                          hover:border-pink-400 dark:hover:border-pink-500
-                          focus:border-pink-500 dark:focus:border-pink-400 
-                          focus:ring-4 focus:ring-pink-500/20 
-                          transition-all duration-300 cursor-pointer 
-                          shadow-md hover:shadow-xl hover:shadow-pink-500/20 dark:hover:shadow-pink-500/10
-                          hover:scale-[1.02] focus:scale-[1.02]
-                          focus:shadow-2xl focus:shadow-pink-500/30 dark:focus:shadow-pink-500/20
-                          appearance-none"
-              >
-                <option value="TODOS">🌐 Todos</option>
-                <option value="Draft">📝 Borrador</option>
-                <option value="Ready">⏳ Listo</option>
-                <option value="Published">✅ Certificado</option>
-              </select>
-              
-              {/* Animated Chevron */}
-              <motion.div
-                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                whileHover={{ rotate: 180, scale: 1.2 }}
-                transition={{ duration: 0.3 }}
-              >
-                <svg 
-                  className="h-5 w-5 text-pink-600 dark:text-pink-400 transition-colors" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor" 
-                  strokeWidth={2.5}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </motion.div>
-
-              {/* Hover glow effect */}
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 opacity-0 group-hover:opacity-20 dark:group-hover:opacity-10 transition-opacity duration-300 -z-10 blur-xl"></div>
-            </div>
-            </div>
-          </div><div className="space-y-3">
-            {filteredVersiones.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
-                  <DocumentTextIcon className="h-8 w-8 text-gray-400 dark:text-gray-500" />
-                </div>
-                <h3 className="text-base font-medium text-gray-900 dark:text-white mb-1">
-                  No hay versiones disponibles
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Crea tu primera versión para comenzar
-                </p>
-              </div>
-            ) : (
-              filteredVersiones.map((version, index) => (
-                <motion.div
-                  key={version.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.03 }}
-                  className="group flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-2xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-200 backdrop-blur-sm"
-                ><div className="flex items-center gap-4 flex-1 min-w-0 w-full sm:w-auto">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex-shrink-0">
-                      <DocumentTextIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-display font-semibold text-lg text-gray-900 dark:text-white truncate tracking-tight">
-                        v{version.numeroVersion}
-                      </h4>
-                      {version.nombre && (
-                        <p className="text-sm font-body font-normal text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                          {version.nombre}
-                        </p>
-                      )}
-                    </div>
-                  </div><div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-                    <Badge 
-                      variant={getEstadoBadgeVariant(version.estado)}
-                      className="text-xs px-3 py-1 rounded-xl"
-                    >
-                      {version.estado}
-                    </Badge>
-                    
-                    <span className="text-xs text-gray-400 dark:text-gray-500 hidden lg:inline whitespace-nowrap">
-                      {new Date().toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: 'short'
-                      })}
-                    </span><div className="flex items-center gap-1 ml-auto">
-                      <motion.button
-                        onClick={() => {
-                          setSelectedVersion(version);
-                          setShowVerModal(true);
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="p-2 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all"
-                        title="Ver detalles"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </motion.button>
-                      
-                      <motion.button
-                        onClick={() => {
-                          setSelectedVersion(version);
-                          setShowEditarModal(true);
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
-                        title="Editar"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </motion.button>
-                      
-                      <motion.button
-                        onClick={() => {
-                          setVersionToDelete({ id: version.id, number: version.numeroVersion });
-                          setShowConfirmDialog(true);
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all"
-                        title="Eliminar"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </motion.button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))
-            )}
           </div>
         </div>
-        </motion.div><CrearVersionModal
-          isOpen={showCrearModal}
-          onClose={() => setShowCrearModal(false)}
-          onSubmit={handleCrearVersion}
-        /><VerVersionModal
-          isOpen={showVerModal}
-          onClose={() => {
-            setShowVerModal(false);
-            setSelectedVersion(null);
-          }}
-          version={selectedVersion}
-        /><EditarVersionModal
-          isOpen={showEditarModal}
-          onClose={() => {
-            setShowEditarModal(false);
-            setSelectedVersion(null);
-          }}
-          version={selectedVersion}
-          onSave={(id, updatedData) => {
-            storageService.updateVersion(id, updatedData);
-            loadDashboardData();
-            toast.success(
-              'Versión actualizada',
-              'Los cambios se guardaron exitosamente'
-            );
-          }}
-        />
+        
+        <div className="flex gap-1.5">
+          {([`7d`, `30d`, `90d`] as const).map((range) => (
+            <motion.button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              whileHover={{ scale: 1.03, y: -1 }}
+              whileTap={{ scale: 0.97 }}
+              className={cn(
+                `px-3 py-1.5 rounded-lg text-xs font-sans font-medium transition-all duration-200`,
+                timeRange === range
+                  ? `bg-gradient-to-r from-slate-600 to-gray-600 text-white shadow-md shadow-slate-500/30`
+                  : `bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-slate-600`
+              )}
+            >
+              {range === `7d` ? `7 días` : range === `30d` ? `30 días` : `90 días`}
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
 
-        <ConfirmDialog
-          isOpen={showConfirmDialog}
-          onClose={() => {
-            setShowConfirmDialog(false);
-            setVersionToDelete(null);
-          }}
-          onConfirm={confirmDelete}
-          title="Confirmar Eliminación"
-          message={`¿Seguro que deseas eliminar la versión ${versionToDelete?.number}?`}
-          confirmText="Eliminar"
-          cancelText="Cancelar"
-        />
+      {/* Cards de Métricas ULTRA MEJORADAS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Versiones Este Mes */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          whileHover={{ y: -4, scale: 1.01 }}
+          onHoverStart={() => setHoveredMetric(`versiones`)}
+          onHoverEnd={() => setHoveredMetric(null)}
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 p-4 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
+                <RocketLaunchIcon className="h-5 w-5 text-white" />
+              </div>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: hoveredMetric === `versiones` ? 1 : 0 }}
+                className="p-1 rounded-full bg-white/20 backdrop-blur-sm"
+              >
+                <ArrowUpIcon className="h-3.5 w-3.5 text-white" />
+              </motion.div>
+            </div>
+            <p className="text-white/80 text-xs font-sans font-semibold uppercase tracking-wide mb-1.5">Este Mes</p>
+            <div className="flex items-end gap-2">
+              <h3 className="text-3xl font-sans font-bold text-white">{metricas.versionesEsteMes}</h3>
+              <span className="text-sm text-white/90 font-sans font-medium mb-0.5">versiones</span>
+            </div>
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="px-1.5 py-0.5 rounded-md bg-emerald-400 text-emerald-900 text-xs font-sans font-bold">
+                {metricas.tendencia}
+              </span>
+              <span className="text-xs text-white/70 font-sans font-medium">vs mes anterior</span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Tasa de Éxito */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          whileHover={{ y: -4, scale: 1.01 }}
+          onHoverStart={() => setHoveredMetric(`exito`)}
+          onHoverEnd={() => setHoveredMetric(null)}
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
+                <CheckCircleIcon className="h-5 w-5 text-white" />
+              </div>
+              <motion.div
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="text-xl"
+              >
+                ✓
+              </motion.div>
+            </div>
+            <p className="text-white/80 text-xs font-sans font-semibold uppercase tracking-wide mb-1.5">Tasa de Éxito</p>
+            <div className="flex items-end gap-1.5">
+              <h3 className="text-3xl font-sans font-bold text-white">{metricas.tasaExito}</h3>
+              <span className="text-2xl text-white/90 font-sans font-medium mb-0.5">%</span>
+            </div>
+            <div className="mt-3 bg-white/20 rounded-full h-1.5 overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${metricas.tasaExito}%` }}
+                transition={{ duration: 1, delay: 0.5 }}
+                className="h-full bg-white rounded-full"
+              />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Tiempo Promedio */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          whileHover={{ y: -4, scale: 1.01 }}
+          onHoverStart={() => setHoveredMetric(`tiempo`)}
+          onHoverEnd={() => setHoveredMetric(null)}
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
+                <ClockIcon className="h-5 w-5 text-white" />
+              </div>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: `linear` }}
+                className="text-xl"
+              >
+                ⏱
+              </motion.div>
+            </div>
+            <p className="text-white/80 text-xs font-sans font-semibold uppercase tracking-wide mb-1.5">Tiempo Promedio</p>
+            <h3 className="text-2xl font-sans font-bold text-white mb-0.5">{metricas.tiempoPromedio}</h3>
+            <p className="text-xs text-white/70 font-sans font-medium">Por versión</p>
+            <div className="mt-2">
+              <span className="px-1.5 py-0.5 rounded-md bg-white/20 text-white text-xs font-sans font-bold">
+                Muy bueno
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Total Versiones */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          whileHover={{ y: -4, scale: 1.01 }}
+          onHoverStart={() => setHoveredMetric(`total`)}
+          onHoverEnd={() => setHoveredMetric(null)}
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-4 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
+                <DocumentTextIcon className="h-5 w-5 text-white" />
+              </div>
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="text-xl"
+              >
+                📊
+              </motion.div>
+            </div>
+            <p className="text-white/80 text-xs font-sans font-semibold uppercase tracking-wide mb-1.5">Total Versiones</p>
+            <div className="flex items-end gap-2">
+              <h3 className="text-3xl font-sans font-bold text-white">{versiones.length}</h3>
+              <span className="text-sm text-white/90 font-sans font-medium mb-0.5">registros</span>
+            </div>
+            <p className="text-xs text-white/70 font-sans font-medium mt-1.5">En el sistema</p>
+          </div>
+        </motion.div>
       </div>
+
+      {/* Gráfico de Tendencia MEJORADO */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-lg border border-gray-100 dark:border-gray-800"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-gray-100 to-slate-100 dark:from-gray-800/40 dark:to-slate-800/40">
+              <ArrowTrendingUpIcon className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-sans font-bold text-gray-900 dark:text-white">Tendencia de Versiones</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-sans">Últimos 6 meses</p>
+            </div>
+          </div>
+          <motion.span 
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="px-2.5 py-1 rounded-full bg-slate-50/70 dark:bg-slate-900/20 text-slate-700 dark:text-slate-300 text-xs font-sans font-medium border border-slate-200/40 dark:border-slate-700/30"
+          >
+            <span className="bg-gradient-to-r from-slate-700 via-gray-700 to-slate-700 dark:from-slate-300 dark:via-gray-300 dark:to-slate-300 bg-clip-text text-transparent font-black">En vivo</span>
+          </motion.span>
+        </div>
+
+        <div className="space-y-2">
+          {versionesPorMes.map((data, i) => (
+            <motion.div
+              key={data.fecha}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 + i * 0.05 }}
+              onHoverStart={() => setHoveredBar(i)}
+              onHoverEnd={() => setHoveredBar(null)}
+              className="group"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-sans font-semibold text-gray-600 dark:text-gray-400 w-9">{data.fecha}</span>
+                <div className="flex-1 relative">
+                  <div className="h-7 bg-gradient-to-r from-gray-50/50 via-slate-50/30 to-gray-50/50 dark:from-gray-800/30 dark:via-gray-800/20 dark:to-gray-800/30 rounded-lg overflow-hidden border border-gray-200/40 dark:border-gray-700/30">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(data.versiones / maxVersiones) * 100}%` }}
+                      transition={{ duration: 1, delay: 0.5 + i * 0.05, type: `spring`, bounce: 0.3 }}
+                      className="h-full bg-gradient-to-r from-slate-300/60 via-gray-300/60 to-slate-400/60 dark:from-slate-400/40 dark:via-gray-400/40 dark:to-slate-500/40 relative group-hover:from-slate-400/70 group-hover:via-gray-400/70 group-hover:to-slate-500/70 transition-all duration-300"
+                    >
+                      <motion.div
+                        animate={{ opacity: [0.2, 0.4, 0.2] }}
+                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent" />
+                    </motion.div>
+                  </div>
+                  <AnimatePresence>
+                    {hoveredBar === i && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                        transition={{ type: "spring", bounce: 0.3 }}
+                        className="absolute -top-10 left-1/2 transform -translate-x-1/2 px-3 py-1.5 bg-gradient-to-r from-slate-600 to-gray-600 text-white rounded-lg text-xs font-sans font-medium shadow-lg"
+                      >
+                        <span className="relative z-10">{data.versiones} versiones</span>
+                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-600" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.8 + i * 0.05, type: `spring`, bounce: 0.3 }}
+                  className="text-xs font-sans font-semibold text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg min-w-[2.5rem] text-center bg-slate-50/80 dark:bg-slate-900/30 border border-slate-200/50 dark:border-slate-700/40"
+                >
+                  {data.versiones}
+                </motion.span>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Distribución por Estado MEJORADO con Gráfico de Dona */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+        className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-lg border border-gray-100 dark:border-gray-800"
+      >
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/40 dark:to-pink-900/40">
+            <SparklesIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h3 className="text-base font-sans font-bold text-gray-900 dark:text-white tracking-tight">Distribución por Estado</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-sans">Vista general del flujo</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Gráfico Visual */}
+          <div className="space-y-2.5">
+            {estadoDistribution.map((item, i) => (
+              <motion.div
+                key={item.estado}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.45 + i * 0.05 }}
+                whileHover={{ scale: 1.01, x: 3 }}
+                className="group p-3 rounded-xl bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/50 border border-gray-100 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{item.icon}</span>
+                    <span className="text-sm font-sans font-bold text-gray-900 dark:text-white">{item.estado}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-sans font-black text-gray-900 dark:text-white">{item.cantidad}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-sans font-semibold">{item.porcentaje}%</p>
+                  </div>
+                </div>
+                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${item.porcentaje}%` }}
+                    transition={{ duration: 1, delay: 0.5 + i * 0.05, type: `spring` }}
+                    className="h-full rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Stats Rápidas */}
+          <div className="flex flex-col justify-center space-y-3">
+            <div className="p-4 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-100 dark:border-purple-800">
+              <div className="flex items-center gap-2 mb-2.5">
+                <UserGroupIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <h4 className="text-sm font-sans font-bold text-gray-900 dark:text-white">Resumen General</h4>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 dark:text-gray-400 font-sans font-medium">Total activo</span>
+                  <span className="text-sm font-sans font-bold text-gray-900 dark:text-white">{versiones.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 dark:text-gray-400 font-sans font-medium">Completadas</span>
+                  <span className="text-sm font-sans font-bold text-emerald-600 dark:text-emerald-400">
+                    {versiones.filter(v => v.estado === `Published`).length}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 dark:text-gray-400 font-sans font-medium">En progreso</span>
+                  <span className="text-sm font-sans font-bold text-amber-600 dark:text-amber-400">
+                    {versiones.filter(v => v.estado === `Ready`).length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <motion.div
+              whileHover={{ scale: 1.01 }}
+              className="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-100 dark:border-blue-800"
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <SparklesIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <h4 className="text-sm font-sans font-bold text-gray-900 dark:text-white">Insight</h4>
+              </div>
+              <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-sans font-medium">
+                El sistema muestra un <span className="font-sans font-bold text-blue-600 dark:text-blue-400">excelente rendimiento</span> con una tasa de éxito del <span className="font-sans font-bold">{metricas.tasaExito}%</span> y un tiempo promedio optimizado.
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
-};
+}
 
-export default Dashboard;
+

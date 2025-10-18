@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   DocumentDuplicateIcon,
@@ -8,7 +8,7 @@ import {
   EyeIcon,
   PencilIcon
 } from '@heroicons/react/24/outline';
-import { Card, Badge, Input } from '@/components/ui';
+import { Card, Badge, Input, LoadingSpinner } from '@/components/ui';
 import { Version, VersionEstado } from '@/types';
 import { storageService } from '@/services/storageService';
 import { mockVersiones, USE_MOCK_DATA } from '@/data/mockData';
@@ -163,7 +163,11 @@ const Versions = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+        <LoadingSpinner 
+          size="xl" 
+          variant="gradient" 
+          text="Cargando versiones..."
+        />
       </div>
     );
   }
@@ -171,7 +175,7 @@ const Versions = () => {
   return (
     <div className="space-y-8"><div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
         <motion.h1 
-          className="text-5xl sm:text-6xl font-display font-extrabold bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent tracking-tight"
+          className="text-5xl sm:text-6xl font-sans font-extrabold bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent tracking-tight"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
@@ -213,7 +217,7 @@ const Versions = () => {
               <select
                 value={filterEstado}
                 onChange={(e) => setFilterEstado(e.target.value as VersionEstado | 'TODOS')}
-                className="px-4 py-2.5 pr-10 text-sm sm:text-base w-full font-display font-semibold rounded-xl 
+                className="px-4 py-2.5 pr-10 text-sm sm:text-base w-full font-sans font-semibold rounded-xl 
                           border-2 border-gray-200 dark:border-gray-700 
                           backdrop-blur-xl bg-white/80 dark:bg-gray-800/80
                           hover:bg-gradient-to-br hover:from-pink-50/90 hover:via-purple-50/80 hover:to-white/90 
@@ -273,7 +277,7 @@ const Versions = () => {
                       <DocumentDuplicateIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-display font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base truncate">
+                      <h3 className="font-sans font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base truncate">
                         v{version.numeroVersion}
                       </h3>
                       <p className="text-xs sm:text-sm font-body font-normal text-gray-500 dark:text-gray-400 truncate">
@@ -379,7 +383,7 @@ const Versions = () => {
       {filteredVersions.length === 0 && (
         <div className="text-center py-12">
           <DocumentDuplicateIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-display font-semibold text-gray-900 dark:text-gray-100">
+          <h3 className="mt-2 text-sm font-sans font-semibold text-gray-900 dark:text-gray-100">
             No hay versiones
           </h3>
           <p className="mt-1 text-sm font-body text-gray-500 dark:text-gray-400">

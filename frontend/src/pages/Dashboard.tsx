@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   DocumentTextIcon, 
@@ -6,7 +6,7 @@ import {
   CheckCircleIcon, 
   PlusIcon
 } from '@heroicons/react/24/outline';
-import { Badge, Input } from '@/components/ui';
+import { Badge, Input, LoadingSpinner } from '@/components/ui';
 import { Version, VersionEstado, DashboardStats } from '@/types';
 import { versionService } from '@/services/versionService';
 import CrearVersionModal from '@/components/versiones/CrearVersionModal';
@@ -109,7 +109,7 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error cargando dashboard:', error);
       // Fallback a datos mock si hay error
-      console.log('🔄 Fallback a datos mock por error de conexión');
+      console.log('📄 Fallback a datos mock por error de conexión');
       storageService.saveVersiones(mockVersiones);
       storageService.saveStats(mockStats);
       setVersiones(mockVersiones);
@@ -142,25 +142,25 @@ const Dashboard = () => {
     storageService.deleteVersion(versionToDelete.id);
     loadDashboardData();
     toast.error(
-      '🗑️ Versión Eliminada',
-      `La versión ${versionToDelete.number} ha sido eliminada permanentemente`
+      'ðŸ—‘ï¸ VersiÃ³n Eliminada',
+      `La versiÃ³n ${versionToDelete.number} ha sido eliminada permanentemente`
     );
     setVersionToDelete(null);
   };
 
   const handleCrearVersion = async (versionData: CrearVersionData) => {
     try {
-      // Crear nueva versión usando el servicio de persistencia
+      // Crear nueva versiÃ³n usando el servicio de persistencia
       const nuevaVersion = storageService.addVersion({
         cliente: versionData.cliente || 'Sistema Principal',
-        nombre: versionData.nombreVersionCliente || `Versión ${versionData.versionBase}`,
+        nombre: versionData.nombreVersionCliente || `VersiÃ³n ${versionData.versionBase}`,
         numeroVersion: versionData.versionBase || '1.0.0',
         buildYyyymmdd: versionData.build || new Date().toISOString().slice(0, 10).replace(/-/g, ''),
         estado: 'Draft' as VersionEstado,
         responsable: versionData.responsable || 'Usuario'
       });
 
-      console.log('✅ Versión creada exitosamente:', nuevaVersion);
+      console.log('âœ… VersiÃ³n creada exitosamente:', nuevaVersion);
 
       // Simular delay de red para UX
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -189,7 +189,11 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="loading-shimmer w-32 h-32 ultra-rounded"></div>
+        <LoadingSpinner 
+          size="xl" 
+          variant="gradient" 
+          text="Cargando dashboard..."
+        />
       </div>
     );
   }
@@ -202,7 +206,7 @@ const Dashboard = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-4xl sm:text-5xl font-display font-extrabold tracking-tight bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent drop-shadow-sm">
+            <h1 className="text-4xl sm:text-5xl font-sans font-extrabold tracking-tight bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent drop-shadow-sm">
               Gestor de Versiones
             </h1>
             <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 font-body font-normal mt-2">
@@ -237,7 +241,7 @@ const Dashboard = () => {
               </div>
               <div>
                 <p className="text-xs font-body font-semibold uppercase tracking-widest text-purple-600 dark:text-purple-400 mb-1">Total Versiones</p>
-                <h3 className="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
+                <h3 className="text-4xl font-sans font-bold text-gray-900 dark:text-white tracking-tight">
                   {stats?.versiones.totalVersiones || 0}
                 </h3>
               </div>
@@ -252,7 +256,7 @@ const Dashboard = () => {
               </div>
               <div>
                 <p className="text-xs font-body font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-1">En Progreso</p>
-                <h3 className="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
+                <h3 className="text-4xl font-sans font-bold text-gray-900 dark:text-white tracking-tight">
                   {(stats?.versiones.versionesPorEstado?.['Draft'] || 0) + 
                    (stats?.versiones.versionesPorEstado?.['Ready'] || 0)}
                 </h3>
@@ -268,7 +272,7 @@ const Dashboard = () => {
               </div>
               <div>
                 <p className="text-xs font-body font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">Publicadas</p>
-                <h3 className="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
+                <h3 className="text-4xl font-sans font-bold text-gray-900 dark:text-white tracking-tight">
                   {stats?.versiones.versionesPorEstado?.['Published'] || 0}
                 </h3>
               </div>
@@ -285,7 +289,7 @@ const Dashboard = () => {
               </div>
               <div>
                 <p className="text-xs font-body font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1">Selladas</p>
-                <h3 className="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
+                <h3 className="text-4xl font-sans font-bold text-gray-900 dark:text-white tracking-tight">
                   {stats?.versiones.versionesPorEstado?.['Sealed'] || 0}
                 </h3>
               </div>
@@ -300,7 +304,7 @@ const Dashboard = () => {
         >
         <div className="p-6"><div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
+              <h2 className="text-2xl font-sans font-bold text-gray-900 dark:text-white tracking-tight">
                 Versiones Recientes
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 font-body mt-1">
@@ -318,7 +322,7 @@ const Dashboard = () => {
               <select
                 value={filterEstado}
                 onChange={(e) => setFilterEstado(e.target.value as VersionEstado | 'TODOS')}
-                className="px-4 py-2.5 pr-10 text-sm sm:text-base w-full font-display font-semibold rounded-xl 
+                className="px-4 py-2.5 pr-10 text-sm sm:text-base w-full font-sans font-semibold rounded-xl 
                           border-2 border-gray-200 dark:border-gray-700 
                           backdrop-blur-xl bg-white/80 dark:bg-gray-800/80
                           hover:bg-gradient-to-br hover:from-pink-50/90 hover:via-purple-50/80 hover:to-white/90 
@@ -386,7 +390,7 @@ const Dashboard = () => {
                       <DocumentTextIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-display font-semibold text-lg text-gray-900 dark:text-white truncate tracking-tight">
+                      <h4 className="font-sans font-semibold text-lg text-gray-900 dark:text-white truncate tracking-tight">
                         v{version.numeroVersion}
                       </h4>
                       {version.nombre && (
