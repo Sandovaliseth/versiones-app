@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -93,11 +93,12 @@ const BentoNavbar = ({
       >
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <motion.div
-              className="flex items-center gap-3 cursor-pointer group"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
+            <Link to="/">
+              <motion.div
+                className="flex items-center gap-3 cursor-pointer group"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
               <motion.div
                 className="relative w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg"
                 animate={{
@@ -123,7 +124,7 @@ const BentoNavbar = ({
                 />
               </motion.div>
               <div>
-                <h1 className="text-lg font-display font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent">
+                <h1 className="text-lg font-sans font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent">
                   Versiones App
                 </h1>
                 <p className="text-[10px] text-gray-600 dark:text-gray-400 font-body leading-tight">
@@ -131,6 +132,7 @@ const BentoNavbar = ({
                 </p>
               </div>
             </motion.div>
+            </Link>
 
             <div className="flex-1" />
 
@@ -257,10 +259,10 @@ const BentoNavbar = ({
               className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-[80%] max-w-2xl rounded-3xl bg-gradient-to-br from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 shadow-2xl p-6 overflow-hidden"
             >
               <div className="mb-6">
-                <h2 className="text-2xl font-display font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent">
+                <h2 className="text-2xl font-sans font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent">
                   Módulos del Sistema
                 </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 font-display mt-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400 font-sans mt-1">
                   Navega por los módulos principales
                 </p>
               </div>
@@ -392,7 +394,7 @@ const BentoNavbar = ({
                               </motion.span>
                             )}
 
-                            {/* Ícono */}
+                            {/* Ãcono */}
                             <motion.div
                               whileHover={{ 
                                 scale: 1.1,
@@ -409,12 +411,12 @@ const BentoNavbar = ({
                               )}
                             >
                               <Icon className="w-8 h-8 text-white relative z-10" />
-                              {/* Sombra del ícono */}
+                              {/* Sombra del Ã­cono */}
                               <div className="absolute -inset-0.5 bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-xl blur-sm -z-10" />
                             </motion.div>
                             
                             {/* Título */}
-                            <h3 className="text-base font-display font-bold text-center text-gray-900 dark:text-white leading-tight px-2">
+                            <h3 className="text-base font-sans font-bold text-center text-gray-900 dark:text-white leading-tight px-2">
                               {module.title}
                             </h3>
                             
@@ -447,3 +449,4 @@ const BentoNavbar = ({
 };
 
 export default BentoNavbar;
+
