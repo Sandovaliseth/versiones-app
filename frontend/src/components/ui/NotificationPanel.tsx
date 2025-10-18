@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+﻿import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, CheckCircleIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 
@@ -88,13 +88,13 @@ export function NotificationPanel({
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 100, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-20 right-6 z-50 w-full max-w-md rounded-3xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-2xl overflow-hidden"
+            className="fixed top-20 right-6 z-50 w-full max-w-md rounded-3xl bg-white/70 dark:bg-gray-900/70 backdrop-blur-3xl border border-white/30 dark:border-gray-700/30 shadow-2xl overflow-hidden"
             style={{ maxHeight: 'calc(100vh - 6rem)' }}
           >
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-pink-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+            <div className="sticky top-0 bg-gradient-to-r from-pink-50/80 to-purple-50/80 dark:from-gray-800/80 dark:to-gray-800/80 backdrop-blur-xl border-b border-white/30 dark:border-gray-700/30 p-4">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-display font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-lg font-sans font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   Notificaciones
                   {unreadCount > 0 && (
                     <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold">
@@ -153,10 +153,10 @@ export function NotificationPanel({
                         transition={{ delay: index * 0.05 }}
                         onClick={() => onMarkAsRead(notification.id)}
                         className={cn(
-                          'p-4 cursor-pointer transition-colors',
+                          'p-4 cursor-pointer transition-all backdrop-blur-sm',
                           !notification.read 
-                            ? 'bg-gradient-to-r from-pink-50/50 to-purple-50/50 dark:from-pink-900/10 dark:to-purple-900/10'
-                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                            ? 'bg-gradient-to-r from-pink-50/70 to-purple-50/70 dark:from-pink-900/20 dark:to-purple-900/20'
+                            : 'hover:bg-white/40 dark:hover:bg-gray-800/40'
                         )}
                       >
                         <div className="flex gap-3">
@@ -204,3 +204,4 @@ export function NotificationPanel({
     </AnimatePresence>
   );
 }
+

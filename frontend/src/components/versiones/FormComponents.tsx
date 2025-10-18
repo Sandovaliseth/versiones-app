@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+﻿import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
 import Input from '../ui/Input';
 import { cn } from '../../lib/utils';
@@ -42,11 +42,11 @@ export const FormSection: React.FC<FormSectionProps> = ({
     }}
   >
     <div>
-      <h3 className="font-display text-lg font-extrabold text-gray-900 dark:text-white tracking-tight">
+      <h3 className="font-sans text-lg font-extrabold text-gray-900 dark:text-white tracking-tight">
         {title}
       </h3>
       {description && (
-        <p className="text-sm text-gray-700 dark:text-gray-300 mt-2 font-body font-medium leading-relaxed">
+        <p className="text-sm text-gray-800 dark:text-gray-300 mt-2 font-body font-semibold leading-relaxed">
           {description}
         </p>
       )}
@@ -80,7 +80,7 @@ export const FieldGroup: React.FC<FieldGroupProps> = ({
     </label>
     {children}
     {helper && (
-      <p className="text-xs text-gray-600 dark:text-gray-300 font-body font-medium">
+      <p className="text-xs text-gray-700 dark:text-gray-300 font-body font-semibold">
         {helper}
       </p>
     )}
@@ -164,7 +164,7 @@ export const TextAreaField: React.FC<TextAreaFieldProps> = ({
       onChange={(e) => onChange(e.target.value)}
       rows={rows}
       className={cn(
-        'input-modern w-full resize-none font-display font-semibold rounded-2xl !text-black dark:!text-white placeholder:!text-gray-400 placeholder:!opacity-100 dark:placeholder:!text-gray-500',
+        'input-modern w-full resize-none font-sans font-semibold rounded-2xl !text-gray-900 dark:!text-white placeholder:!text-gray-600 placeholder:!opacity-100 dark:placeholder:!text-gray-400',
         error && 'border-red-500 dark:border-red-500'
       )}
     />
@@ -201,23 +201,19 @@ export const SelectField: React.FC<SelectFieldProps> = ({
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setIsOpen(true)}
           onBlur={() => setIsOpen(false)}
-          className="input-modern w-full rounded-2xl font-display font-semibold !text-black dark:!text-white appearance-none pr-14 cursor-pointer 
-                     border-2 border-gray-300 dark:border-gray-600
+          className="input-modern w-full rounded-2xl font-sans font-semibold !text-gray-900 dark:!text-white appearance-none pr-14 cursor-pointer 
+                     border-2 border-gray-400 dark:border-gray-600
                      hover:border-pink-400 dark:hover:border-pink-500
-                     focus:border-pink-500 dark:focus:border-pink-400 focus:ring-4 focus:ring-pink-200/50 dark:focus:ring-pink-800/50
-                     transition-all duration-300 ease-out
-                     backdrop-blur-xl bg-white/80 dark:bg-gray-800/80
-                     hover:bg-gradient-to-br hover:from-pink-50/90 hover:via-purple-50/80 hover:to-white/90 
-                     dark:hover:from-pink-950/30 dark:hover:via-purple-950/20 dark:hover:to-gray-800/90
-                     shadow-md hover:shadow-xl hover:shadow-pink-500/20 dark:hover:shadow-pink-500/10
-                     hover:scale-[1.02] focus:scale-[1.02]
-                     focus:shadow-2xl focus:shadow-pink-500/30 dark:focus:shadow-pink-500/20"
+                     focus:border-pink-500 dark:focus:border-pink-400 focus:ring-2 focus:ring-pink-200/50 dark:focus:ring-pink-800/50
+                     transition-all duration-200
+                     bg-white dark:bg-gray-800
+                     hover:shadow-md focus:shadow-lg"
         >
           {options.map((opt) => (
             <option 
               key={opt.value} 
               value={opt.value} 
-              className="font-body py-3 px-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              className="font-body py-3 px-4 bg-white dark:bg-gray-800 !text-gray-900 dark:!text-gray-100 font-semibold"
             >
               {opt.label}
             </option>
@@ -399,3 +395,4 @@ export const PathField: React.FC<PathFieldProps> = ({
     </FieldGroup>
   );
 };
+

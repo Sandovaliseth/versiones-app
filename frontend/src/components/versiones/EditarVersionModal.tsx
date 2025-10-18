@@ -157,23 +157,23 @@ export default function EditarVersionModal({
                     {/* Campos editables */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-sans font-bold text-gray-900 dark:text-white">
-                        ðŸ“ Campos Editables
+                        📝 Campos Editables
                       </h3>
 
                       <TextField
-                        label="Nombre de la VersiÃ³n"
+                        label="Nombre de la Versión"
                         value={formData.nombre}
                         onChange={(value) => handleChange('nombre', value)}
                         placeholder="Ej: Release Primavera 2024"
-                        helper="Opcional: Un nombre descriptivo para esta versiÃ³n"
+                        helper="Opcional: Un nombre descriptivo para esta versión"
                       />
 
                       <TextField
                         label="Responsable"
                         value={formData.responsable}
                         onChange={(value) => handleChange('responsable', value)}
-                        placeholder="Nombre del responsable tÃ©cnico"
-                        helper="Opcional: Persona encargada de esta versiÃ³n"
+                        placeholder="Nombre del responsable técnico"
+                        helper="Opcional: Persona encargada de esta versión"
                       />
                     </div>
                   </div>

@@ -30,7 +30,7 @@ export default function LoadingSpinner({
 }: LoadingSpinnerProps) {
   return (
     <div className={cn('flex flex-col items-center justify-center gap-4', className)}>
-      {/* Spinner principal con animaciÃ³n */}
+      {/* Spinner principal con animación */}
       <div className="relative">
         {/* Anillo exterior giratorio */}
         <motion.div
@@ -97,7 +97,7 @@ export default function LoadingSpinner({
           )}
         />
 
-        {/* PartÃ­culas orbitales */}
+        {/* Partículas orbitales */}
         {['gradient', 'primary'].includes(variant) && (
           <>
             <motion.div

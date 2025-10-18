@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+﻿import { motion } from 'framer-motion';
 import { useToastContext } from '@/components/layout/MainLayout';
 import { 
   CheckCircleIcon, 
@@ -96,7 +96,7 @@ export function NotificationDemo() {
     <div className="max-w-4xl mx-auto p-8 space-y-8">
       {/* Header */}
       <div className="text-center space-y-3">
-        <h1 className="text-4xl font-display font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-4xl font-sans font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
           Sistema de Notificaciones Sincronizadas
         </h1>
         <p className="text-gray-600 dark:text-gray-400 font-body text-lg">
@@ -113,7 +113,7 @@ export function NotificationDemo() {
         <div className="flex gap-3">
           <InformationCircleIcon className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <div className="space-y-2">
-            <h3 className="font-display font-bold text-blue-900 dark:text-blue-100">
+            <h3 className="font-sans font-bold text-blue-900 dark:text-blue-100">
               ¿Cómo funciona?
             </h3>
             <ul className="space-y-1 text-sm text-blue-800 dark:text-blue-200 font-body">
@@ -147,14 +147,14 @@ export function NotificationDemo() {
                   <Icon className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className={`font-display font-bold ${demo.textColor} dark:text-white mb-1`}>
+                  <h3 className={`font-sans font-bold ${demo.textColor} dark:text-white mb-1`}>
                     {demo.title}
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 font-body line-clamp-2">
                     {demo.message}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-500 font-body mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Click para mostrar →
+                    Click para mostrar â†’
                   </p>
                 </div>
               </div>
@@ -171,11 +171,11 @@ export function NotificationDemo() {
         className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl p-6 border-2 border-purple-200 dark:border-purple-800"
       >
         <div className="text-center space-y-4">
-          <h3 className="font-display font-bold text-purple-900 dark:text-purple-100">
-            🎭 Demo de Secuencia
+          <h3 className="font-sans font-bold text-purple-900 dark:text-purple-100">
+            ðŸŽ­ Demo de Secuencia
           </h3>
           <p className="text-sm text-purple-800 dark:text-purple-200 font-body">
-            Muestra una serie de notificaciones en orden para demostrar la sincronización automática
+            Muestra una serie de notificaciones en orden para demostrar la sincronizaciÃ³n automÃ¡tica
           </p>
           <motion.button
             onClick={handleSequence}
@@ -195,8 +195,8 @@ export function NotificationDemo() {
         transition={{ delay: 0.5 }}
         className="bg-gray-100 dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-300 dark:border-gray-700"
       >
-        <h3 className="font-display font-bold text-gray-900 dark:text-white mb-3">
-          🔧 Información Técnica
+        <h3 className="font-sans font-bold text-gray-900 dark:text-white mb-3">
+          ðŸ”§ InformaciÃ³n TÃ©cnica
         </h3>
         <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300 font-mono">
           <div className="flex justify-between">
@@ -212,11 +212,11 @@ export function NotificationDemo() {
             <span className="text-blue-600 dark:text-blue-400">localStorage</span>
           </div>
           <div className="flex justify-between">
-            <span>Límite de historial:</span>
+            <span>LÃ­mite de historial:</span>
             <span className="text-emerald-600 dark:text-emerald-400">50 notificaciones</span>
           </div>
           <div className="flex justify-between">
-            <span>Duración por defecto:</span>
+            <span>DuraciÃ³n por defecto:</span>
             <span className="text-amber-600 dark:text-amber-400">5000ms (5s)</span>
           </div>
         </div>
@@ -229,21 +229,21 @@ export function NotificationDemo() {
         transition={{ delay: 0.6 }}
         className="bg-gray-900 dark:bg-gray-950 rounded-2xl p-6 border-2 border-gray-700"
       >
-        <h3 className="font-display font-bold text-white mb-3">
-          💻 Ejemplo de Código
+        <h3 className="font-sans font-bold text-white mb-3">
+          ðŸ’» Ejemplo de CÃ³digo
         </h3>
         <pre className="text-sm text-gray-300 font-mono overflow-x-auto">
 {`// 1. Obtener el contexto
 const toast = useToastContext();
 
-// 2. Usar en tu código
+// 2. Usar en tu cÃ³digo
 const handleAction = async () => {
   try {
     await doSomething();
     
-    // Toast aparece Y se archiva automáticamente
+    // Toast aparece Y se archiva automÃ¡ticamente
     toast.success(
-      'Operación exitosa',
+      'OperaciÃ³n exitosa',
       'Los datos se guardaron correctamente'
     );
   } catch (error) {
@@ -255,3 +255,4 @@ const handleAction = async () => {
     </div>
   );
 }
+

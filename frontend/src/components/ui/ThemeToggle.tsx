@@ -1,15 +1,15 @@
-import { motion } from 'framer-motion';
+﻿import { motion } from 'framer-motion';
 import { useAdaptiveTheme, getThemeEmoji, getThemeLabel } from '@/hooks/useAdaptiveTheme';
 
 /**
  * Componente ThemeToggle - Toggle moderno para cambiar entre modos claro/oscuro
  * 
- * Características UX/UI 2025:
+ * CaracterÃ­sticas UX/UI 2025:
  * - Animaciones suaves con Framer Motion
  * - Microinteracciones inteligentes
  * - Feedback visual inmediato
- * - Diseño glassmorphism
- * - Transiciones elásticas
+ * - DiseÃ±o glassmorphism
+ * - Transiciones elÃ¡sticas
  */
 export function ThemeToggle() {
   const { theme, resolvedTheme, toggleTheme } = useAdaptiveTheme();
@@ -113,7 +113,7 @@ export function ThemePanel() {
               
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-display font-semibold text-gray-900 dark:text-white">
+                  <h4 className="font-sans font-semibold text-gray-900 dark:text-white">
                     {themeOption.label}
                   </h4>
                   {theme === themeOption.value && (
@@ -158,3 +158,4 @@ export function ThemePanel() {
     </div>
   );
 }
+
