@@ -5,6 +5,7 @@ export { default as Card } from './Card';
 export { default as Badge } from './Badge';
 export { default as Modal } from './Modal';
 export { default as Toast, useToast } from './Toast';
+export { default as LoadingSpinner } from './LoadingSpinner';
 
 // Re-exportar tipos relacionados
 export type { ButtonProps, InputProps, CardProps, BadgeProps, ModalProps } from '@/types';
