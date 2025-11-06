@@ -32,7 +32,7 @@ const Versions = () => {
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const [versionToDelete, setVersionToDelete] = useState<{ id: string; number: string } | null>(null);
   
-  const { addToast, ToastContainer } = useToast();
+  const { ToastContainer } = useToast();
   const toastGlobal = useToastContext();
 
   useEffect(() => {
@@ -130,13 +130,13 @@ const Versions = () => {
       
       // Solo usar notificación global con tipo error (color rojo/warning)
       toastGlobal.error(
-        '🗑️ Versión Eliminada',
-        `La versión ${versionToDelete.number} ha sido eliminada permanentemente del sistema`
+        'Version Eliminada',
+        `La version ${versionToDelete.number} ha sido eliminada permanentemente del sistema`
       );
     } else {
       toastGlobal.error(
-        '❌ Error al Eliminar',
-        `No se pudo eliminar la versión ${versionToDelete.number}`
+        'Error al Eliminar',
+        `No se pudo eliminar la version ${versionToDelete.number}`
       );
     }
     setVersionToDelete(null);
@@ -344,13 +344,7 @@ const Versions = () => {
                           setVersions(updatedVersions);
                           storageService.saveVersiones(updatedVersions);
                           
-                          addToast({
-                            type: 'success',
-                            title: 'Firmada',
-                            message: `v${version.numeroVersion} firmada`
-                          });
-                          
-                          // Notificación global
+                          // Solo una notificación global (remover addToast duplicado)
                           toastGlobal.success(
                             'Versión firmada digitalmente',
                             `La versión ${version.numeroVersion} ha sido firmada y certificada exitosamente`

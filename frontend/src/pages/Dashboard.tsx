@@ -142,8 +142,8 @@ const Dashboard = () => {
     storageService.deleteVersion(versionToDelete.id);
     loadDashboardData();
     toast.error(
-      'ðŸ—‘ï¸ VersiÃ³n Eliminada',
-      `La versiÃ³n ${versionToDelete.number} ha sido eliminada permanentemente`
+      'Version Eliminada',
+      `La version ${versionToDelete.number} ha sido eliminada permanentemente`
     );
     setVersionToDelete(null);
   };

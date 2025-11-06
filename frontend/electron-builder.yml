@@ -100,7 +100,7 @@ publish: null
 
 # Configuración de metadatos
 extraMetadata:
-  main: electron/main.js
+  main: electron/main.cjs
   name: gestor-versiones
   version: 1.0.0
   description: Sistema profesional de gestión de versiones con diseño moderno UX/UI 2025

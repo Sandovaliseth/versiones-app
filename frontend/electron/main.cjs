@@ -49,8 +49,7 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-    // Abrir DevTools también en producción para debug
-    mainWindow.webContents.openDevTools();
+    // En producción no abrir DevTools
   }
 
   // Mostrar ventana cuando esté lista para evitar flash blanco
