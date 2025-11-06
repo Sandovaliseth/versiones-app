@@ -1,0 +1,6 @@
+{
+  "name": "versiones-frontend-electron",
+  "version": "1.0.0",
+  "main": "main.cjs",
+  "description": "Electron main process for Versiones App"
+}
