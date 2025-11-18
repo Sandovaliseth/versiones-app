@@ -5,6 +5,7 @@ backend/.idea/
 # Node
 frontend/node_modules/
 frontend/dist/
+frontend/dist-electron/
 
 # n8n
 infra/n8n_data/
