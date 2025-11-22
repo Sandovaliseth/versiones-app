@@ -1,0 +1,22 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gestor de Versiones icon">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+    <linearGradient id="stroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+  </defs>
+  <rect width="228" height="228" x="14" y="14" rx="48" fill="url(#bg)" />
+  <path
+    d="M74 70 L112 188 L128 216 L144 188 L182 70"
+    fill="none"
+    stroke="url(#stroke)"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="128" cy="138" r="14" fill="#fcd34d" opacity="0.85" />
+</svg>

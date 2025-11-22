@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useToastContext } from '@/components/layout/MainLayout';
 import CrearVersionModal from '@/components/versiones/CrearVersionModal';
 import { CrearVersionData } from '@/components/versiones/types';
+import { crearCorreoHtml } from '@/components/versiones/helpers';
 import VerVersionModal from '@/components/versiones/VerVersionModal';
 import EditarVersionModal from '@/components/versiones/EditarVersionModal';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
@@ -61,7 +62,6 @@ const Versions = () => {
       } else if (USE_MOCK_DATA) {
         // Inicializar con datos mock si no hay nada guardado
         console.log('📊 Inicializando con datos mock');
-        storageService.saveVersiones(mockVersiones);
         setVersions(mockVersiones);
       } else {
         setVersions([]);
@@ -71,6 +71,114 @@ const Versions = () => {
       setVersions([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const runAutomationAfterCreate = async (formData: CrearVersionData, numeroVersion: string) => {
+    if (typeof window === 'undefined' || !window.electronAPI) {
+      return;
+    }
+
+    const rutaCompilacion = formData.rutaCompilacion?.trim();
+    if (!rutaCompilacion) {
+      toastGlobal.warning(
+        'Ruta requerida para automatizar',
+        'Se creó la versión, pero no podemos preparar el correo sin la ruta de compilación'
+      );
+      return;
+    }
+
+    const electronAPI = window.electronAPI;
+    const findBinaryPath = async (fileName?: string) => {
+      if (!fileName) return null;
+      try {
+        const search = await electronAPI.findFiles(rutaCompilacion, [fileName]);
+        if (search?.ok && Array.isArray(search.matches) && search.matches.length > 0) {
+          const ordered = [...search.matches].sort((a, b) => a.length - b.length);
+          return ordered[0];
+        }
+      } catch (error) {
+        console.error('Error buscando archivo', error);
+      }
+      return null;
+    };
+
+    try {
+      toastGlobal.info('Preparando adjuntos', `Buscando artefactos en ${rutaCompilacion}`);
+
+      const filesToZip: string[] = [];
+      const baseBinaryName = formData.archivoBinBase || formData.nombreArchivoBin;
+      const baseBinary = await findBinaryPath(baseBinaryName);
+      if (baseBinary) {
+        filesToZip.push(baseBinary);
+      } else if (baseBinaryName) {
+        toastGlobal.warning('Bin principal no encontrado', `No se halló ${baseBinaryName} en la ruta seleccionada`);
+      }
+
+      const aumentoBinary = formData.incluirVersionAumento
+        ? await findBinaryPath(formData.archivoBinAumento)
+        : null;
+      if (aumentoBinary) {
+        filesToZip.push(aumentoBinary);
+      } else if (formData.incluirVersionAumento && formData.archivoBinAumento) {
+        toastGlobal.warning('Bin de aumento no encontrado', `Revisa el nombre ${formData.archivoBinAumento}`);
+      }
+
+      if (!filesToZip.length) {
+        toastGlobal.warning('Sin archivos adjuntos', 'No fue posible ubicar los binarios especificados para adjuntar automáticamente');
+        return;
+      }
+
+      const [md5Base, md5Aumento] = await Promise.all([
+        baseBinary ? electronAPI.computeMd5(baseBinary) : Promise.resolve(''),
+        aumentoBinary ? electronAPI.computeMd5(aumentoBinary) : Promise.resolve('')
+      ]);
+
+      const safeClient = (formData.nombreVersionCliente || formData.cliente || 'version').replace(/[^a-zA-Z0-9-_]/g, '_');
+      const safeBuild = (formData.build || Date.now().toString().slice(-6)).replace(/[^a-zA-Z0-9-_]/g, '_');
+      const safeName = `${safeClient}_${safeBuild}`;
+      const zipResult = await electronAPI.zipArtifacts({
+        files: filesToZip,
+        zipName: `${safeName}.zip`,
+        subfolder: formData.cliente || 'version'
+      });
+
+      if (!zipResult?.ok || !zipResult.path) {
+        throw new Error(zipResult?.error || 'No se pudo crear el archivo ZIP con los binarios');
+      }
+
+      const emailPayload: CrearVersionData = { ...formData };
+      if (!emailPayload.checksumBase && md5Base) emailPayload.checksumBase = md5Base;
+      if (!emailPayload.checksumAumento && md5Aumento) emailPayload.checksumAumento = md5Aumento;
+
+      const { subject, body } = crearCorreoHtml(
+        emailPayload,
+        emailPayload.checksumAumento || md5Aumento,
+        emailPayload.linksOneDrive || null
+      );
+
+      const draftResult = await electronAPI.createOutlookDraft({
+        subject,
+        body,
+        attachments: [zipResult.path],
+        saveToSent: false,
+        send: false
+      });
+
+      if (!draftResult?.ok) {
+        throw new Error(draftResult?.error || 'Outlook no respondió al crear el borrador');
+      }
+
+      toastGlobal.success(
+        'Borrador generado en Outlook',
+        `Adjuntamos automáticamente ${filesToZip.length} archivo(s) para la versión ${numeroVersion}`
+      );
+    } catch (error) {
+      console.error('Automatización al crear versión falló:', error);
+      toastGlobal.error(
+        'Automatización incompleta',
+        error instanceof Error ? error.message : 'Error inesperado al preparar el email'
+      );
     }
   };
 
@@ -106,6 +214,8 @@ const Versions = () => {
         'Versión creada exitosamente',
         `La versión ${numeroVersion} ha sido creada y está lista para trabajar`
       );
+
+      await runAutomationAfterCreate(versionData, numeroVersion);
       
     } catch (error) {
       console.error('❌ Error creando versión:', error);

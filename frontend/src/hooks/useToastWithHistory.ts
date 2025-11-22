@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useToast, Toast } from '@/components/ui/ToastManager';
-import { useNotifications } from './useNotifications';
+import { useNotificationsContext } from '@/context/NotificationsContext';
 
 /**
  * Hook combinado que sincroniza toasts temporales con el historial persistente.
@@ -9,7 +9,7 @@ import { useNotifications } from './useNotifications';
  * no cuando el toast desaparece, para que aparezcan en tiempo real en NotificationPanel.
  */
 export function useToastWithHistory() {
-  const { addNotification } = useNotifications();
+  const { addNotification } = useNotificationsContext();
 
   // Callback que se ejecuta cuando un toast se cierra (mantener para compatibilidad)
   const handleToastArchive = useCallback((_toast: Toast) => {

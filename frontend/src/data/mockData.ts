@@ -55,4 +55,4 @@ export const mockStats: DashboardStats = {
 };
 
 // Flag para usar datos mock durante desarrollo
-export const USE_MOCK_DATA = true;
+export const USE_MOCK_DATA = false;

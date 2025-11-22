@@ -9,11 +9,23 @@ export interface CrearVersionData {
   versionBase?: string;
   versionAumento?: string;
   build?: string;
+  incluirVersionAumento?: boolean;
   tipoFirma?: TipoFirma;
   cid?: string;
   descripcionBreve?: string;
   rutaCompilacion?: string;
   rutaLocal?: string;
+  // Campos para compilación automática y checksums
+  rutaProyecto?: string;
+  archivoVersion?: string;
+  nombreArchivoBin?: string;
+  archivoBinBase?: string;
+  archivoBinAumento?: string;
+  comandoCompilacion?: string;
+  compilePyMode?: string;
+  compilePyTarget?: string;
+  checksumBase?: string;
+  checksumAumento?: string;
   
   // --- CONTROL ---
   tipoDocumento: TipoDocumento;
@@ -26,6 +38,11 @@ export interface CrearVersionData {
   linksOneDrive?: string;
   capturaEvidencia?: File;
   formatoRelease?: File; // Documento/formato del release
+  // Campos para certificación con AUMENTO
+  nombrePkgBase?: string;
+  checksumPkgBase?: string;
+  nombrePkgAumento?: string;
+  checksumPkgAumento?: string;
   
   // --- METADATOS OPCIONALES ---
   responsable?: string;
@@ -65,12 +82,23 @@ export const initialFormData: CrearVersionData = {
   terminal: '',
   versionBase: '',
   versionAumento: '',
+  incluirVersionAumento: false,
   build: '',
   tipoFirma: 'generica',
   cid: '0',
   descripcionBreve: '',
   rutaCompilacion: '',
   rutaLocal: '',
+  rutaProyecto: '',
+  archivoVersion: '',
+  nombreArchivoBin: '',
+  archivoBinBase: '',
+  archivoBinAumento: '',
+  comandoCompilacion: '',
+  compilePyMode: '2',
+  compilePyTarget: '2',
+  checksumBase: '',
+  checksumAumento: '',
   tipoDocumento: 'firma',
   archivoPkg: undefined,
   nombrePkg: '',
@@ -79,6 +107,10 @@ export const initialFormData: CrearVersionData = {
   linksOneDrive: '',
   capturaEvidencia: undefined,
   formatoRelease: undefined,
+  nombrePkgBase: '',
+  checksumPkgBase: '',
+  nombrePkgAumento: '',
+  checksumPkgAumento: '',
   responsable: '',
   departamento: '',
   notasTecnicas: ''

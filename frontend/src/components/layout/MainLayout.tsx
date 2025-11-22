@@ -2,7 +2,7 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import BentoNavbar from './BentoNavbar';
 import { ToastManager } from '../ui/ToastManager';
 import { useToastWithHistory } from '@/hooks/useToastWithHistory';
-import { useNotifications } from '@/hooks/useNotifications';
+import { NotificationsProvider, useNotificationsContext } from '@/context/NotificationsContext';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -20,8 +20,8 @@ export const useToastContext = () => {
   return context;
 };
 
-const MainLayout = ({ children }: MainLayoutProps) => {
-  const notificationsState = useNotifications();
+const MainLayoutContent = ({ children }: MainLayoutProps) => {
+  const notificationsState = useNotificationsContext();
   const toast = useToastWithHistory();
   
   const [darkMode, setDarkMode] = useState(() => {
@@ -73,5 +73,11 @@ const MainLayout = ({ children }: MainLayoutProps) => {
     </ToastContext.Provider>
   );
 };
+
+const MainLayout = ({ children }: MainLayoutProps) => (
+  <NotificationsProvider>
+    <MainLayoutContent>{children}</MainLayoutContent>
+  </NotificationsProvider>
+);
 
 export default MainLayout;

@@ -6,6 +6,12 @@ backend/.idea/
 frontend/node_modules/
 frontend/dist/
 
+# Desktop build artifacts (not tracked)
+frontend/dist-electron/
+frontend/dist-installer/
+
+# Temporary files created during local work
+tmp_*
 # n8n
 infra/n8n_data/
 infra/.env

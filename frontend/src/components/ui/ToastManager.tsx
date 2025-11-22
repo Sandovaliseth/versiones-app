@@ -90,14 +90,12 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) 
           </p>
         </div>
 
-        <motion.button
+        <button
           onClick={onRemove}
-          whileHover={{ scale: 1.1, rotate: 90 }}
-          whileTap={{ scale: 0.9 }}
           className="flex-shrink-0 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
           <XMarkIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-        </motion.button>
+        </button>
       </div>
     </motion.div>
   );

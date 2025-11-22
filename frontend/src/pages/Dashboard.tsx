@@ -47,12 +47,15 @@ const Dashboard = () => {
   }, []);
 
   const loadDashboardData = async () => {
+    let storedVersiones: Version[] | null = null;
+    let storedStats: DashboardStats | null = null;
+
     try {
       setLoading(true);
       
       // Primero intentar cargar desde localStorage
-      const storedVersiones = storageService.getVersiones();
-      const storedStats = storageService.getStats();
+      storedVersiones = storageService.getVersiones();
+      storedStats = storageService.getStats();
 
       if (storedVersiones && storedStats) {
         console.log('✅ Datos cargados desde localStorage');
@@ -67,12 +70,9 @@ const Dashboard = () => {
         console.log('📊 Inicializando con datos mock');
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Guardar en localStorage para persistencia
-        storageService.saveVersiones(mockVersiones);
-        storageService.saveStats(mockStats);
-        
         setVersiones(mockVersiones);
         setStats(mockStats);
+        return;
       } else {
         // Cargar datos reales del backend
         const [versionesResponse] = await Promise.all([
@@ -108,12 +108,30 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error cargando dashboard:', error);
-      // Fallback a datos mock si hay error
-      console.log('📄 Fallback a datos mock por error de conexión');
-      storageService.saveVersiones(mockVersiones);
-      storageService.saveStats(mockStats);
-      setVersiones(mockVersiones);
-      setStats(mockStats);
+      if (USE_MOCK_DATA) {
+        console.log('📄 Fallback a datos mock por error de conexión');
+        setVersiones(mockVersiones);
+        setStats(mockStats);
+      } else {
+        setVersiones(storedVersiones || []);
+        setStats(
+          storedStats || {
+            versiones: {
+              totalVersiones: storedVersiones?.length || 0,
+              versionesPorEstado: {
+                Draft: 0,
+                Ready: 0,
+                Published: 0,
+                Sealed: 0
+              },
+              versionesRecientes: [],
+              artefactosPorTipo: { bin: 0, pkg: 0, doc: 0 }
+            },
+            actividad: [],
+            trabajosPendientes: 0
+          }
+        );
+      }
     } finally {
       setLoading(false);
     }
