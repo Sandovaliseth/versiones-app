@@ -1,4 +1,5 @@
 ﻿import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, DocumentTextIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { cn } from '../../lib/utils';
@@ -326,7 +327,8 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     const text = stripped.text || normalized;
     return { text, status };
   }, [progressStep]);
-  const [showAumentoConfirm, setShowAumentoConfirm] = useState(false);
+  // Eliminado el modal de confirmación AUMENTO: ahora el flujo
+  // depende únicamente del toggle `incluirVersionAumento`.
   const [waitingForAumentoCompile, setWaitingForAumentoCompile] = useState(false);
   const [errorModal, setErrorModal] = useState<{ show: boolean; title: string; message: string }>({ show: false, title: '', message: '' });
   const [compilationDetected, setCompilationDetected] = useState(false);
@@ -349,6 +351,8 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   const detectTargetsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const historialFolderRef = useRef<string | null>(null);
   const historialZipRef = useRef<string | null>(null);
+  const lastMonitoredMd5Ref = useRef<string | null>(null);
+  const checksumErrorShownRef = useRef<boolean>(false);
   const parsedErrorMessage = useMemo(() => {
     const paragraphs: string[] = [];
     const bulletItems: string[] = [];
@@ -378,6 +382,8 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     return { paragraphs, bulletItems, filePath };
   }, [errorModal.message]);
 
+  // Nota: se removió el cálculo de monitoredBinPath no utilizado
+
   const handleCopyErrorPath = async (value: string) => {
     if (!value) return;
     try {
@@ -387,6 +393,16 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     } catch (copyError) {
       console.warn('No se pudo copiar la ruta del error:', copyError);
     }
+  };
+
+  const showChecksumIdenticalError = () => {
+    if (checksumErrorShownRef.current) return;
+    setErrorModal({
+      show: true,
+      title: 'Checksums idénticos',
+      message: CHECKSUM_RECOMPILE_MESSAGE
+    });
+    checksumErrorShownRef.current = true;
   };
 
   const handleCopyHistorialPath = async (value: string | null, kind: 'folder' | 'zip') => {
@@ -475,12 +491,18 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     const sourceBinPath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
 
     try {
-      if (md5Aumento) {
-        const exists = await window.electronAPI.fileExists(sourceBinPath);
-        if (exists) {
-          await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\AUMENTO\\${formData.nombreArchivoBin}`);
-        }
+      const exists = await window.electronAPI.fileExists(sourceBinPath);
+      
+      // Copiar archivo BASE si existe y tenemos checksum BASE
+      if (exists && md5Base && !md5Aumento) {
+        await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\BASE\\${formData.nombreArchivoBin}`);
       }
+      
+      // Copiar archivo AUMENTO si existe y tenemos checksum AUMENTO
+      if (exists && md5Aumento) {
+        await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\AUMENTO\\${formData.nombreArchivoBin}`);
+      }
+      
       await actualizarChecksumsFile(folderPath, md5Base, md5Aumento);
       const zipPath = await zipHistorialFolder(folderPath);
       return { folderPath, zipPath };
@@ -567,12 +589,7 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   const fieldRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const shouldShowBinHint = Boolean(
-    supportsProjectLookup &&
-    formData.rutaProyecto &&
-    formData.nombreArchivoBin &&
-    (artifactHints.isSearching || artifactHints.binPath)
-  );
+  // Pistas bajo el campo .bin deshabilitadas según solicitud del usuario
 
   const shouldShowHeaderHint = Boolean(
     supportsProjectLookup &&
@@ -763,8 +780,10 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
         const prefixMatch = match.currentValue.match(/^([A-Za-z_]*)/);
         const prefix = prefixMatch ? prefixMatch[1] : '';
         
-        // Usar la versión TAL CUAL viene del formulario (respetar formato con puntos o guiones bajos)
-        const newMainVer = prefix ? `${prefix}${newVersion}` : newVersion;
+        // Ajustar delimitadores según el valor actual (si usa "_" convertir puntos a guiones bajos)
+        const usesUnderscore = match.currentValue.includes('_');
+        const normalizedNew = usesUnderscore ? newVersion.replace(/\./g, '_') : newVersion;
+        const newMainVer = prefix ? `${prefix}${normalizedNew}` : normalizedNew;
         
         console.log(`Actualizando ${match.varName}: "${match.currentValue}" -> "${newMainVer}"`);
         
@@ -772,6 +791,27 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
         const replacePattern = new RegExp(`#define\\s+${match.varName}\\s+"[^"]+"`, 'g');
         content = content.replace(replacePattern, `#define ${match.varName} "${newMainVer}"`);
         updated = true;
+      }
+
+      // Pattern 3b: Igual que el anterior pero SIN comillas (#define VAR PREFIJO_X_Y)
+      if (!updated) {
+        const mainVerNoQuotes = /#define\s+([A-Z_]+)\s+([A-Za-z_]*\d+_\d+(?:_\d+)?)/g;
+        let nqMatch;
+        const nqMatches: Array<{ fullMatch: string; varName: string; currentValue: string }> = [];
+        while ((nqMatch = mainVerNoQuotes.exec(content)) !== null) {
+          nqMatches.push({ fullMatch: nqMatch[0], varName: nqMatch[1], currentValue: nqMatch[2] });
+        }
+        if (nqMatches.length > 0) {
+          const m = nqMatches[0];
+          const prefix = (m.currentValue.match(/^([A-Za-z_]*)/) || ['',''])[1];
+          const usesUnderscore = m.currentValue.includes('_');
+          const normalizedNew = usesUnderscore ? newVersion.replace(/\./g, '_') : newVersion;
+          const replacement = `#define ${m.varName} ${prefix ? prefix + normalizedNew : normalizedNew}`;
+          console.log(`Actualizando ${m.varName}: ${m.currentValue} -> ${prefix ? prefix + normalizedNew : normalizedNew}`);
+          const replacePattern = new RegExp(`#define\\s+${m.varName}\\s+[A-Za-z_]*\\d+_\\d+(?:_\\d+)?`, 'g');
+          content = content.replace(replacePattern, replacement);
+          updated = true;
+        }
       }
       
       // Pattern 4: #define <CUALQUIER_NOMBRE> "20251010" (formato fecha YYYYMMDD)
@@ -815,6 +855,24 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
         console.log(`${otherMatch[1]} detectado con valor "${otherMatch[2]}" - se mantiene sin cambios`);
       }
       
+      if (!updated) {
+        // Fallback conservador: si encontramos una constante que contenga VER o VERSION y tenga una cadena con dígitos tipo 1.2.3 o 1_2_3, reemplazamos solo esa parte
+        const fallbackPattern = /#define\s+([A-Z_]*VER[A-Z_]*|VERSION[A-Z_]*)\s+"([^"\n]*?)(\d+(?:[._]\d+){1,3})([^"\n]*)"/g;
+        let fbMatch = fallbackPattern.exec(content);
+        if (fbMatch) {
+          const varName = fbMatch[1];
+          const before = fbMatch[2] || '';
+          const currentVer = fbMatch[3] || '';
+          const after = fbMatch[4] || '';
+          const usesUnderscore = currentVer.includes('_');
+          const normalizedNew = usesUnderscore ? newVersion.replace(/\./g, '_') : newVersion;
+          const newValue = `#define ${varName} "${before}${normalizedNew}${after}"`;
+          const pattern = new RegExp(`#define\\s+${varName}\\s+"[^"\n]*?${currentVer}[^"\n]*?"`);
+          content = content.replace(pattern, newValue);
+          updated = true;
+        }
+      }
+
       if (!updated) {
         console.error('❌ No se encontró ningún patrón de versión conocido en el archivo');
         return false;
@@ -872,9 +930,8 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
         return '';
       }
 
-      const { subject, body } = crearCorreoHtml(formData as any, md5Aumento || undefined, carpetaOneDrive || null);
+      const { subject, body } = crearCorreoHtml(formData as any, md5Aumento || undefined, carpetaOneDrive || null, formData.checksumBase);
 
-      // Preparar lista de archivos a adjuntar
       const attachments: string[] = [];
       if (historialZipPath && await window.electronAPI.fileExists(historialZipPath)) {
         attachments.push(historialZipPath);
@@ -1072,35 +1129,52 @@ ${formData.linksOneDrive || 'N/A'}
     }
   };
 
-  // Función para monitorear cambios en el archivo .bin
   const startFileMonitoring = () => {
     if (!formData.rutaCompilacion || !formData.nombreArchivoBin) return;
-    
     const binFilePath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
 
     if (checkFileIntervalRef.current) {
       clearInterval(checkFileIntervalRef.current);
       checkFileIntervalRef.current = null;
     }
-    
+    setCompilationDetected(false);
+    setChecksumWarning('');
+    checksumErrorShownRef.current = false;
+
+    (async () => {
+      try {
+        lastMonitoredMd5Ref.current = await window.electronAPI.computeMd5(binFilePath);
+      } catch {
+        lastMonitoredMd5Ref.current = null;
+      }
+    })();
+
     checkFileIntervalRef.current = setInterval(async () => {
       try {
         const md5Current = await window.electronAPI.computeMd5(binFilePath);
-        if (md5Current && md5Current !== formData.checksumBase) {
-          // El archivo cambió!
-          setCompilationDetected(true);
-          if (checkFileIntervalRef.current) {
-            clearInterval(checkFileIntervalRef.current);
-            checkFileIntervalRef.current = null;
+        if (!md5Current) return;
+
+        if (lastMonitoredMd5Ref.current && md5Current !== lastMonitoredMd5Ref.current) {
+          if (formData.checksumBase && md5Current === formData.checksumBase) {
+            setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
+            setCompilationDetected(false);
+            showChecksumIdenticalError();
+          } else {
+            setChecksumWarning('');
+            setCompilationDetected(true);
+            if (checkFileIntervalRef.current) {
+              clearInterval(checkFileIntervalRef.current);
+              checkFileIntervalRef.current = null;
+            }
           }
         }
-      } catch (e) {
-        // Archivo no existe aún o error leyendo
+
+        lastMonitoredMd5Ref.current = md5Current;
+      } catch {
       }
-    }, 3000); // Verificar cada 3 segundos
+    }, 1000);
   };
 
-  // Mantener rutaProyecto sincronizada si solo existe rutaCompilacion (compatibilidad con preferencias antiguas)
   useEffect(() => {
     if (!formData.rutaProyecto && formData.rutaCompilacion) {
       setFormData(prev => {
@@ -1110,7 +1184,6 @@ ${formData.linksOneDrive || 'N/A'}
     }
   }, [formData.rutaProyecto, formData.rutaCompilacion]);
 
-  // Detectar script/bin automáticamente cuando cambia la ruta del proyecto
   useEffect(() => {
     const rutaProyecto = (formData.rutaProyecto || '').trim();
     const electronAPI = typeof window !== 'undefined' ? window.electronAPI : undefined;
@@ -1236,9 +1309,7 @@ ${formData.linksOneDrive || 'N/A'}
     };
   }, [formData.rutaProyecto]);
 
-  // Limpiar intervalos al desmontar componente
   useEffect(() => {
-    // Autocompletar build con fecha de hoy (YYMMDD) al abrir
     if (isOpen) {
       const today = getTodayYYMMDD();
       console.log('Fecha generada para build:', today);
@@ -1307,10 +1378,10 @@ ${formData.linksOneDrive || 'N/A'}
     isSubmittingRef.current = true;
 
     try {
-      // Solo para FIRMA: calcular checksums automáticamente
       if (formData.tipoDocumento === 'firma') {
         setIsCalculatingChecksums(true);
         setShowProgressModal(true);
+        setProgressStep('⚙️ Procesando versión BASE...');
         
         if (!formData.rutaCompilacion || !formData.nombreArchivoBin) {
           setErrorModal({ show: true, title: '❌ Faltan datos', message: 'Debes proporcionar la ruta de compilación y el nombre del archivo .bin' });
@@ -1323,35 +1394,34 @@ ${formData.linksOneDrive || 'N/A'}
         const binFilePath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
         let md5Base: string | null = null;
 
-        // PASO 1: Calcular MD5 BASE
-        setProgressStep('🔐 Calculando checksum BASE...');
         md5Base = await window.electronAPI.computeMd5(binFilePath);
         
         if (!md5Base) {
-          setProgressStep('❌ Archivo BASE no encontrado');
-          setTimeout(() => {
-            setShowProgressModal(false);
-            setIsCalculatingChecksums(false);
-            isSubmittingRef.current = false;
-            setErrorModal({ show: true, title: '❌ Archivo no encontrado', message: `No se encontró el archivo .bin en la ruta:\n\n${binFilePath}\n\nVerifica que hayas compilado la versión BASE correctamente.` });
-          }, 2000);
+          setShowProgressModal(false);
+          setIsCalculatingChecksums(false);
+          isSubmittingRef.current = false;
+          setErrorModal({ show: true, title: '❌ Archivo no encontrado', message: `No se encontró el archivo .bin en la ruta:\n\n${binFilePath}\n\nVerifica que hayas compilado la versión BASE correctamente.` });
           return;
         }
         
         console.log('✅ MD5 BASE:', md5Base);
         setFormData(prev => ({ ...prev, checksumBase: md5Base! }));
         await snapshotBaseBinary(binFilePath, md5Base);
-        
-        // Mostrar modal de confirmación para AUMENTO
-        setProgressStep('✅ Checksum BASE registrado');
+
         setShowProgressModal(false);
         setIsCalculatingChecksums(false);
-        setShowAumentoConfirm(true);
-        isSubmittingRef.current = false;
-        return;
+
+        if (!(formData.incluirVersionAumento ?? false)) {
+          await handleAumentoNo();
+          isSubmittingRef.current = false;
+          return;
+        } else {
+          await handleAumentoYes();
+          isSubmittingRef.current = false;
+          return;
+        }
       }
 
-      // Para CERTIFICACIÓN: enviar directamente
       onSubmit(formData);
       handleClose();
       isSubmittingRef.current = false;
@@ -1365,21 +1435,16 @@ ${formData.linksOneDrive || 'N/A'}
     }
   };
 
-  // Handlers para modal de confirmación AUMENTO
   const handleAumentoYes = async () => {
-    setShowAumentoConfirm(false);
+    checksumErrorShownRef.current = false;
     
-    // Verificar si tiene configuración para compilación automática
     const tieneCompilacionAuto = !!(formData.rutaProyecto && formData.archivoVersion && formData.comandoCompilacion);
     
     if (tieneCompilacionAuto) {
-      // FLUJO AUTOMÁTICO: Actualizar .h → Compilar → Calcular MD5s → Crear correo
       await ejecutarFlujoAutomatico();
     } else {
-      // FLUJO MANUAL: Esperar a que usuario compile
       setCompilationDetected(false);
       setWaitingForAumentoCompile(true);
-      // Iniciar polling para detectar cambio en archivo
       startFileMonitoring();
     }
   };
@@ -1425,7 +1490,6 @@ ${formData.linksOneDrive || 'N/A'}
       const isCompilePy = /compile\.py/i.test(formData.comandoCompilacion || '');
       const stdinData = isCompilePy ? `${formData.compilePyMode || '2'}\n${formData.compilePyTarget || '2'}\n` : undefined;
 
-      // PASO 1: Buscar archivo de versión automáticamente
       setProgressStep('🔍 Buscando archivo de versión...');
       const projectRoot = formData.rutaProyecto ? normalizeWindowsSlashes(formData.rutaProyecto) : '';
       const versionSearchBase = projectRoot || formData.rutaProyecto || '';
@@ -1436,7 +1500,6 @@ ${formData.linksOneDrive || 'N/A'}
       const manualVersionPath = resolveProjectFilePath(projectRoot, manualEntry);
       const headerHintPath = artifactHints.headerPath ? normalizeWindowsSlashes(artifactHints.headerPath) : null;
 
-      // Intentar primero con la ruta especificada por el usuario
       if (manualEntry) {
         let manualCandidate = manualVersionPath;
 
@@ -1471,7 +1534,7 @@ ${formData.linksOneDrive || 'N/A'}
 
       const versionSearchOptions = {
         hintFile: formData.archivoVersion || undefined,
-        versionBase: formData.versionAumento || formData.versionBase || undefined,
+        versionBase: formData.versionBase || undefined,
         nombreVersionCliente: formData.nombreVersionCliente || undefined
       };
 
@@ -1494,8 +1557,20 @@ ${formData.linksOneDrive || 'N/A'}
         return;
       }
 
-      // PASO 2: Compilar la versión BASE nuevamente para garantizar binario fresco
-      setProgressStep('🔁 Compilando versión BASE...');
+      setProgressStep('🧪 Verificando/actualizando versión BASE en código...');
+      try {
+        if (versionFilePath && formData.versionBase) {
+          const currentContent = await window.electronAPI.readTextFile(versionFilePath);
+          if (currentContent?.ok && currentContent.content) {
+            const basePattern = new RegExp(`\"${formData.versionBase.replace(/\./g, '\\.')}\"|${formData.versionBase.replace(/\./g, '_')}`, 'i');
+            if (!basePattern.test(currentContent.content)) {
+              await updateVersionInFile(versionFilePath, formData.versionBase);
+            }
+          }
+        }
+      } catch {}
+
+      setProgressStep('⚙️ Procesando versión BASE...');
       console.log('🔨 Recompilando BASE con comando:', formData.comandoCompilacion);
       const baseCompileResult = await window.electronAPI.runCompilation(
         formData.comandoCompilacion!,
@@ -1524,7 +1599,6 @@ ${formData.linksOneDrive || 'N/A'}
       setFormData(prev => ({ ...prev, checksumBase: checksumBaseAuto }));
       await snapshotBaseBinary(binFilePath, checksumBaseAuto);
 
-      // Guardar contenido original para restaurar tras compilar AUMENTO
       try {
         const readOriginal = await window.electronAPI.readTextFile(versionFilePath);
         if (readOriginal?.ok && readOriginal.content) {
@@ -1532,7 +1606,6 @@ ${formData.linksOneDrive || 'N/A'}
         }
       } catch {}
 
-      // PASO 3: Actualizar archivo .h con versión AUMENTO
       setProgressStep('📝 Actualizando versión AUMENTO en código...');
       console.log('📝 Editando archivo:', versionFilePath);
       const updateResult = await updateVersionInFile(versionFilePath, formData.versionAumento);
@@ -1548,11 +1621,10 @@ ${formData.linksOneDrive || 'N/A'}
         return;
       }
 
-      // PASO 3: Compilar versión AUMENTO
       setProgressStep('🔨 Compilando versión AUMENTO...');
       console.log('🔍 Comando de compilación:', formData.comandoCompilacion);
       console.log('🔍 Directorio de trabajo:', compilationDir);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Pequeña pausa para mostrar mensaje
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       const compileResult = await window.electronAPI.runCompilation(
         formData.comandoCompilacion!,
@@ -1573,7 +1645,6 @@ ${formData.linksOneDrive || 'N/A'}
         return;
       }
 
-      // PASO 3: Calcular MD5 AUMENTO
       setProgressStep('🔐 Calculando checksum AUMENTO...');
       const md5Aumento = await window.electronAPI.computeMd5(binFilePath);
       
@@ -1584,7 +1655,6 @@ ${formData.linksOneDrive || 'N/A'}
         return;
       }
 
-      // PASO 4: Validar que sean diferentes
       if (formData.checksumBase === md5Aumento) {
         setProgressStep('⚠️ Checksums idénticos');
 
@@ -1607,6 +1677,7 @@ ${formData.linksOneDrive || 'N/A'}
           setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
           setCompilationDetected(false);
           setWaitingForAumentoCompile(true);
+          showChecksumIdenticalError();
           startFileMonitoring();
         }, 1200);
         return;
@@ -1619,14 +1690,12 @@ ${formData.linksOneDrive || 'N/A'}
       const historialInfo = await registrarAumentoEnHistorial(checksumBaseAuto, md5Aumento);
       historialZipPath = historialInfo.zipPath || historialZipRef.current;
 
-      // PASO 4.1: Restaurar versión BASE en el código (importante para el repositorio)
       setProgressStep('Restableciendo version BASE en el codigo...');
       try {
         if (originalVersionContent) {
           const restoreResult = await window.electronAPI.writeTextFile(versionFilePath, originalVersionContent);
           if (!restoreResult.ok) {
             console.warn('No se pudo restaurar el archivo a su estado original. Intentando fijar a version BASE...');
-            // Fallback: fijar a la versión base usando el actualizador
             if (formData.versionBase) {
               await updateVersionInFile(versionFilePath, formData.versionBase);
             }
@@ -1640,28 +1709,23 @@ ${formData.linksOneDrive || 'N/A'}
         console.warn('Advertencia al restaurar la versión base:', e);
       }
 
-      // PASO 5: Crear estructura de carpetas en OneDrive
       setProgressStep('📁 Creando estructura de carpetas...');
       const carpetaCreada = await crearEstructuraCarpetas(formData.checksumBase, md5Aumento);
 
-      // PASO 6: Tomar captura de pantalla del ejecutable automáticamente
       setProgressStep('📸 Capturando pantalla automáticamente...');
       if (carpetaCreada) {
         await new Promise(resolve => setTimeout(resolve, 500));
         await capturarPantalla(carpetaCreada);
       }
 
-      // PASO 7: Generar Release Notes
       setProgressStep('📄 Generando Release Notes...');
       if (carpetaCreada) {
         await generarReleaseNotes(carpetaCreada);
       }
 
-      // PASO 8: Actualizar Roadmap
       setProgressStep('🗺️ Actualizando Roadmap...');
       await actualizarRoadmap();
 
-      // PASO 9: Crear correo en Outlook con adjuntos
       setProgressStep('📧 Generando correo en Outlook...');
       await new Promise(resolve => setTimeout(resolve, 800));
       const asuntoCorreo = await crearCorreoOutlook(md5Aumento, carpetaCreada, historialZipPath || undefined);
@@ -1673,14 +1737,12 @@ ${formData.linksOneDrive || 'N/A'}
       setIsCalculatingChecksums(false);
       setShowProgressModal(false);
       
-      // Guardar versión
       const dataFinal: CrearVersionData = {
         ...formData,
         checksumAumento: md5Aumento
       };
       onSubmit(dataFinal);
       
-      // Iniciar monitoreo de respuesta
       if (asuntoCorreo) {
         iniciarMonitoreoRespuesta(asuntoCorreo);
       }
@@ -1696,17 +1758,13 @@ ${formData.linksOneDrive || 'N/A'}
   };
 
   const handleAumentoNo = async () => {
-    setShowAumentoConfirm(false);
     
-    // Crear versión solo con BASE
     const dataParaGuardar: CrearVersionData = {
       ...formData,
-      // Limpiar campos de AUMENTO
       versionAumento: undefined,
       checksumAumento: undefined
     };
     
-    // Intentar crear correo aun si es solo BASE (mostrar indicador de generación)
     try {
       setShowProgressModal(true);
       setProgressStep('📦 Actualizando historial y ZIP...');
@@ -1750,7 +1808,19 @@ ${formData.linksOneDrive || 'N/A'}
       return;
     }
 
-      // Validar que los checksums sean diferentes
+    if (formData.checksumBase === md5Aumento) {
+      console.log('⚠️ Checksums idénticos en Finalizar manual');
+      console.log('BASE:', formData.checksumBase);
+      console.log('AUMENTO:', md5Aumento);
+      setShowProgressModal(false);
+      setIsCalculatingChecksums(false);
+      setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
+      setCompilationDetected(false);
+      showChecksumIdenticalError();
+      startFileMonitoring();
+      return;
+    }
+
       if (formData.checksumBase === md5Aumento) {
         console.log('⚠️ Checksums idénticos detectados');
         console.log('BASE:', formData.checksumBase);
@@ -1759,21 +1829,21 @@ ${formData.linksOneDrive || 'N/A'}
         setIsCalculatingChecksums(false);
         setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
         setCompilationDetected(false);
+        showChecksumIdenticalError();
         startFileMonitoring();
         setWaitingForAumentoCompile(true);
         return;
       }
       setChecksumWarning('');
+
     console.log('✅ MD5 AUMENTO:', md5Aumento);
     setFormData(prev => ({ ...prev, checksumAumento: md5Aumento }));
     setProgressStep('📦 Actualizando historial y ZIP...');
     const historialInfo = await registrarAumentoEnHistorial(formData.checksumBase, md5Aumento);
-    
-    // Crear estructura de carpetas
+
     setProgressStep('📁 Creando estructura de carpetas...');
     const carpetaCreada = await crearEstructuraCarpetas(formData.checksumBase, md5Aumento);
     
-    // Crear correo con adjuntos
     setProgressStep('📧 Generando correo en Outlook...');
     await new Promise(resolve => setTimeout(resolve, 800));
     const asuntoCorreo = await crearCorreoOutlook(md5Aumento, carpetaCreada, historialInfo.zipPath || undefined);
@@ -1785,14 +1855,12 @@ ${formData.linksOneDrive || 'N/A'}
     setIsCalculatingChecksums(false);
     setShowProgressModal(false);
     
-    // Guardar versión
     const dataFinal: CrearVersionData = {
       ...formData,
       checksumAumento: md5Aumento
     };
     onSubmit(dataFinal);
     
-    // Iniciar monitoreo
     if (asuntoCorreo) {
       iniciarMonitoreoRespuesta(asuntoCorreo);
     }
@@ -1806,6 +1874,7 @@ ${formData.linksOneDrive || 'N/A'}
       ...initialFormData,
       ...preferences
     });
+
     historialFolderRef.current = null;
     historialZipRef.current = null;
     setLastHistorialPath(null);
@@ -1818,7 +1887,7 @@ ${formData.linksOneDrive || 'N/A'}
     onClose();
   };
 
-  return (
+  const modalContent = (
     <AnimatePresence mode="wait">
       {isOpen && (
         <>
@@ -1826,11 +1895,10 @@ ${formData.linksOneDrive || 'N/A'}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed top-0 left-0 w-full h-full bg-gray-900 z-[100]"
-            style={{ margin: 0, padding: 0 }}
+            className="fixed inset-0 bg-gray-900/90 backdrop-blur-sm z-[9998]"
             transition={{ duration: 0.2 }}
           />
-          <div className="fixed top-0 left-0 w-full h-full z-[101] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -2174,18 +2242,7 @@ ${formData.linksOneDrive || 'N/A'}
                               helper="Nombre del archivo compilado"
                             />
                           </div>
-                          {shouldShowBinHint && (
-                            <p
-                              className={cn(
-                                'text-xs font-body mt-4 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300',
-                                artifactHints.isSearching && 'text-gray-500'
-                              )}
-                            >
-                              {artifactHints.isSearching
-                                ? 'Buscando el archivo dentro del proyecto...'
-                                : `Archivo detectado en ${artifactHints.binPath}`}
-                            </p>
-                          )}
+                          {/* Pista bajo el campo .bin deshabilitada */}
                         </>
                       )}
 
@@ -2502,64 +2559,11 @@ ${formData.linksOneDrive || 'N/A'}
             </motion.div>
           </div>
 
-          {/* Modal de confirmación AUMENTO */}
-          {showAumentoConfirm && (
-            <div className="fixed inset-0 bg-white/20 backdrop-blur-sm flex items-center justify-center z-[110]">
-              <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 max-w-md mx-4 shadow-2xl border border-gray-200">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <span className="text-2xl text-white">✓</span>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">Checksum BASE Calculado</h3>
-                </div>
-                <div className="bg-white/80 rounded-xl p-4 mb-6 border border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <p className="text-gray-700 text-sm leading-relaxed flex-1">
-                      <span className="font-semibold text-green-600">MD5 BASE:</span>{' '}
-                      <span className="font-mono text-xs break-all select-all">
-                        {formData.checksumBase && formData.checksumBase.length > 0 ? formData.checksumBase : '—'}
-                      </span>
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const val = formData.checksumBase || '';
-                        if (!val) return;
-                        if (navigator?.clipboard?.writeText) {
-                          navigator.clipboard.writeText(val);
-                        }
-                      }}
-                      className="px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"
-                      title="Copiar MD5"
-                    >
-                      Copiar
-                    </button>
-                  </div>
-                </div>
-                <p className="text-gray-700 mb-6 text-center font-medium leading-relaxed">
-                  ¿Deseas crear la versión AUMENTO ahora?
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleAumentoNo}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
-                  >
-                    Solo BASE
-                  </button>
-                  <button
-                    onClick={handleAumentoYes}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
-                  >
-                    Sí, continuar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Modal de confirmación eliminado: el flujo continúa automáticamente según el toggle */}
 
           {/* Modal de espera para compilación AUMENTO */}
           {waitingForAumentoCompile && (
-            <div className="fixed inset-0 bg-white/20 backdrop-blur-sm flex items-center justify-center z-[110]">
+            <div className="fixed inset-0 bg-gray-900/90 backdrop-blur-sm flex items-center justify-center z-[10010]">
               <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 max-w-lg mx-4 shadow-2xl border border-gray-200">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center shadow-lg animate-pulse">
@@ -2567,10 +2571,10 @@ ${formData.linksOneDrive || 'N/A'}
                   </div>
                   <h3 className="text-xl font-bold text-gray-900">Compila la Versión AUMENTO</h3>
                 </div>
-                
+
                 {checksumWarning && (
-                  <div className="mb-6 bg-red-50 border-2 border-red-300 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-r-xl">
+                    <div className="flex items-center gap-2 mb-1">
                       <span className="text-red-600 text-xl">⚠️</span>
                       <p className="font-semibold text-red-800">Checksums Idénticos</p>
                     </div>
@@ -2579,12 +2583,26 @@ ${formData.linksOneDrive || 'N/A'}
                     </p>
                   </div>
                 )}
-                
-                <div className="border-2 border-blue-200 rounded-xl p-4 mb-6 bg-blue-50/50">
-                  <p className="text-sm font-semibold text-blue-900 mb-1">Versión AUMENTO:</p>
-                  <p className="text-xl font-bold text-blue-700 tracking-wide">{formData.versionAumento}</p>
+
+                <div className="bg-white rounded-xl p-5 mb-4 border-2 border-gray-200 shadow-sm">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Versión AUMENTO</p>
+                  <p className="text-3xl font-bold text-gray-900">{formData.versionAumento}</p>
                 </div>
-                
+
+                {formData.checksumBase && (
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 mb-4 border-2 border-green-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                        <span className="text-white text-sm font-bold">✓</span>
+                      </div>
+                      <p className="text-xs font-semibold text-green-700 uppercase tracking-wider">Checksum BASE</p>
+                    </div>
+                    <p className="text-green-800 font-mono text-sm break-all select-all bg-white/50 rounded-lg px-3 py-2">
+                      {formData.checksumBase}
+                    </p>
+                  </div>
+                )}
+
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-xl">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-yellow-600 text-xl">⚠️</span>
@@ -2594,7 +2612,7 @@ ${formData.linksOneDrive || 'N/A'}
                     Compila el proyecto ahora (en tu IDE, VM, o WSL). Cuando el archivo <span className="font-mono font-semibold">.bin</span> esté generado, presiona <strong>"Finalizar"</strong>.
                   </p>
                 </div>
-                
+
                 <div className="flex gap-3">
                   <button
                     onClick={handleAumentoDone}
@@ -2625,7 +2643,7 @@ ${formData.linksOneDrive || 'N/A'}
 
           {/* Modal de progreso */}
           {showProgressModal && (
-            <div className="fixed inset-0 bg-white/20 backdrop-blur-sm flex items-center justify-center z-[110]">
+            <div className="fixed inset-0 bg-gray-900/90 backdrop-blur-sm flex items-center justify-center z-[10015]">
               <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-gray-100">
                 <div className="flex flex-col items-center gap-5">
                   {progressDisplay.status === 'loading' && (
@@ -2644,9 +2662,21 @@ ${formData.linksOneDrive || 'N/A'}
                     </div>
                   )}
 
-                  <p className="text-lg font-semibold text-gray-900 text-center leading-relaxed">
-                    {progressDisplay.text || 'Procesando...'}
-                  </p>
+                  {/* Mostrar checksum BASE de forma destacada */}
+                  {progressDisplay.text?.includes('Checksum BASE calculado:') ? (
+                    <div className="flex flex-col items-center gap-4 w-full">
+                      <p className="text-lg font-semibold text-gray-900">Checksum BASE:</p>
+                      <div className="bg-gray-50 rounded-lg p-4 w-full">
+                        <p className="text-blue-600 font-mono text-sm break-all text-center select-all">
+                          {formData.checksumBase || progressDisplay.text.split(': ')[1]}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-lg font-semibold text-gray-900 text-center leading-relaxed">
+                      {progressDisplay.text || 'Procesando...'}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -2654,8 +2684,8 @@ ${formData.linksOneDrive || 'N/A'}
 
           {/* Modal de error personalizado */}
           {errorModal.show && (
-            <div className="fixed inset-0 bg-gray-900/70 flex items-center justify-center z-[120] p-4">
-              <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 border border-red-200/70 dark:border-red-500/60 shadow-2xl p-6">
+            <div className="fixed inset-0 bg-gray-900/90 flex items-center justify-center z-[10020]">
+              <div className="w-full max-w-lg mx-4 rounded-2xl bg-white dark:bg-gray-900 border border-red-200/70 dark:border-red-500/60 shadow-2xl p-6">
                 <div className="flex flex-col gap-5 text-left w-full">
                   <div className="flex items-center gap-3">
                     <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-3xl">⚠️</div>
@@ -2707,8 +2737,7 @@ ${formData.linksOneDrive || 'N/A'}
 
                   <button
                     onClick={() => setErrorModal({ show: false, title: '', message: '' })}
-                    className="w-full px-5 py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg hover:opacity-90 transition"
-                  >
+                    className="w-full px-5 py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg hover:opacity-90 transition">
                     Entendido
                   </button>
                 </div>
@@ -2719,4 +2748,6 @@ ${formData.linksOneDrive || 'N/A'}
       )}
     </AnimatePresence>
   );
+
+  return createPortal(modalContent, document.body);
 }

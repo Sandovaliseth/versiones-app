@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
@@ -25,7 +26,7 @@ export default function ConfirmDialog({
     onClose();
   };
 
-  return (
+  const modalContent = (
     <AnimatePresence mode="wait">
       {isOpen && (
         <>
@@ -35,12 +36,12 @@ export default function ConfirmDialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[200]"
+            className="fixed inset-0 bg-gray-900/90 backdrop-blur-sm z-[9998]"
             transition={{ duration: 0.2 }}
           />
 
           {/* Responsive Dialog - Centered properly */}
-          <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 sm:p-6">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
             <motion.div
               initial={{ opacity: 0, scale: 0.8, y: 50 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -167,4 +168,6 @@ export default function ConfirmDialog({
       )}
     </AnimatePresence>
   );
+
+  return createPortal(modalContent, document.body);
 }
