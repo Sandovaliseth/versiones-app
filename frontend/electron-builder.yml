@@ -25,7 +25,6 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: electron/icon.ico
   artifactName: ${productName}-Setup-${version}.${ext}
 
 # Instalador NSIS para Windows
@@ -36,9 +35,9 @@ nsis:
   createDesktopShortcut: true         # Crear acceso directo en escritorio
   createStartMenuShortcut: true       # Crear acceso directo en menú inicio
   shortcutName: Gestor de Versiones
-  installerIcon: electron/icon.ico
-  uninstallerIcon: electron/icon.ico
-  installerHeaderIcon: electron/icon.ico
+  # installerIcon: electron/icon.ico
+  # uninstallerIcon: electron/icon.ico
+  # installerHeaderIcon: electron/icon.ico
   deleteAppDataOnUninstall: true      # Limpiar datos al desinstalar
   runAfterFinish: true                # Ejecutar app después de instalar
 

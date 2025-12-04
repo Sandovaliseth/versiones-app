@@ -1,587 +1,441 @@
-# 🎯 Versiones App - Sistema Inteligente de Gestión de Versiones# Versiones App - Diseño Minimalista 2025 🎨
+# 🎯 Versiones App
 
+<div align="center">
 
+![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)
+![Electron](https://img.shields.io/badge/Electron-38-47848F?style=flat-square&logo=electron)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-6db33f?style=flat-square&logo=springboot)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript)
 
-<div align="center">Sistema elegante y minimalista para gestión de versiones, diseñado como aplicación de escritorio siguiendo las tendencias de diseño de 2025.
+**Aplicación de escritorio para gestionar versiones de software**
 
+Automatiza compilación, checksums, historial y correos en Outlook.
 
+[Instalación](#-instalación) · [Características](#-características) · [Uso](#-uso)
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)## ✨ Características Destacadas
-
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-
-![React](https://img.shields.io/badge/React-18-61dafb.svg)### 🎨 Diseño Minimalista 2025
-
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-6db33f.svg)- **Bento Grid Layout**: Tarjetas con glassmorphism avanzado
-
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6.svg)- **Gradientes del Logo**: Colores rosa y morado (#e91e63, #9c27b0)
-
-- **Tipografía Ultra Ligera**: Font-weight 300-400 para elegancia
-
-**Sistema empresarial moderno para la gestión integral de versiones de software con arquitectura Full-Stack**- **Bordes Ultra Redondeados**: border-radius 24px+ en todos los componentes
-
-- **Efectos de Profundidad**: Backdrop blur y sombras suaves modernas
-
-[Características](#-características-principales) • [Tecnologías](#-stack-tecnológico) • [Instalación](#-instalación) • [Arquitectura](#-arquitectura) • [Documentación](#-api-documentation)- **Micro-interacciones**: Animaciones sutiles y fluidas
-
-
-
-</div>### 🖥️ Aplicación de Escritorio
-
-- **Tauri Framework**: Aplicación nativa de escritorio
-
----- **Sin Despliegue Web**: Funciona completamente offline
-
-- **Rendimiento Optimizado**: Menor consumo de recursos que Electron
-
-## 📋 Tabla de Contenidos- **Actualizaciones Automáticas**: Sistema de updates integrado
-
-
-
-- [Descripción General](#-descripción-general)### 🛠️ Stack Tecnológico
-
-- [Características Principales](#-características-principales)- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
-
-- [Stack Tecnológico](#-stack-tecnológico)- **Diseño**: Sistema moderno con CSS Variables y Glassmorphism
-
-- [Arquitectura](#-arquitectura)- **Animaciones**: Framer Motion + Transiciones CSS avanzadas
-
-- [Instalación](#-instalación)- **Desktop**: Tauri (Rust + WebView nativo)
-
-- [Estructura del Proyecto](#-estructura-del-proyecto)- **Backend**: Spring Boot + Flyway + H2/PostgreSQL
-
-- [Desarrollo](#-desarrollo)- **API**: REST con OpenAPI/Swagger
-
-- [API Documentation](#-api-documentation)
-
-- [Testing](#-testing)## 🚀 Inicio Rápido
-
-- [Contribución](#-contribución)
-
-- [Licencia](#-licencia)### Aplicación de Escritorio
-
-```powershell
-
----cd frontend
-
-# Configurar dependencias del sistema
-
-## 🎯 Descripción General./desktop-setup.ps1 setup
-
-
-
-**Versiones App** es un sistema empresarial integral diseñado para gestionar el ciclo completo de versiones de software, desde su creación como borrador hasta su certificación final. La aplicación implementa un flujo de trabajo estructurado que incluye creación, revisión, firma digital y certificación de versiones.# Inicializar Tauri (solo primera vez)
-
-./desktop-setup.ps1 init
-
-### 🎨 Diseño UI/UX Moderno 2025
-
-# Ejecutar en desarrollo
-
-El frontend implementa las últimas tendencias en diseño de interfaces:./desktop-setup.ps1 dev
-
-
-
-- **🎭 Glassmorphism Avanzado**: Efectos de vidrio con `backdrop-blur` y transparencias# Construir para producción
-
-- **✨ Bento Grid Layout**: Diseño modular con tarjetas inteligentes./desktop-setup.ps1 build
-
-- **🌈 Sistema de Gradientes**: Paleta de colores vibrante (purple, pink, cyan, indigo)
-
-- **🎬 Micro-animaciones**: Transiciones fluidas con Framer Motion
-- **🌓 Modo Oscuro**: Tema claro/oscuro con transiciones suaves
-- **📱 Responsive Design**: Adaptable a desktop, tablet y móvil
-- **♿ Accesibilidad**: Navegación por teclado y ARIA labels
+</div>
 
 ---
 
-## 🚀 Características Principales
+## 📸 Capturas
 
-### 📦 Gestión de Versiones
+### Dashboard principal
+Gestiona todas tus versiones con filtros por estado (Borrador, Listo, Certificado).
 
-- ✅ **Creación de Versiones**: Formulario intuitivo con validación en tiempo real
-- 📝 **Estados del Ciclo de Vida**:
-  - `BORRADOR`: Versión en proceso de creación
-  - `LISTO`: Versión lista para firma
-  - `CERTIFICADO`: Versión firmada y certificada
-- 🔍 **Búsqueda y Filtrado**: Sistema de búsqueda avanzada por cliente, terminal, versión
-- 📊 **Vista de Detalles**: Información completa con historial de cambios
-- ✏️ **Edición Inline**: Actualización rápida de versiones existentes
-- 🗑️ **Eliminación Segura**: Confirmación con modal antes de eliminar
+![Dashboard](https://via.placeholder.com/800x450/1e1e2e/ffffff?text=Dashboard+con+filtros+y+b%C3%BAsqueda)
 
-### 🎨 Interfaz de Usuario
+### Crear nueva versión
+Modal con detección automática de `compile.py` y cálculo de checksums MD5.
 
-- **Dashboard Inteligente**:
-  - Vista de tarjetas con glassmorphism
-  - Estadísticas en tiempo real
-  - Filtros dinámicos por estado
-  - Badges de estado con colores semánticos
+![Crear Versión](https://via.placeholder.com/800x450/1e1e2e/ffffff?text=Modal+crear+versi%C3%B3n)
 
-- **Sistema de Notificaciones**:
-  - Toast notifications con animaciones
-  - Tipos: Success, Error, Warning, Info
-  - Auto-dismiss configurable
-  - Stack inteligente (máximo 5 notificaciones)
+### Analíticas en tiempo real
+Visualiza métricas, tendencias y estadísticas de tus versiones.
 
-- **Modales Interactivos**:
-  - Crear versión con validación de campos
-  - Ver detalles con información completa
-  - Editar versión con confirmación
-  - Diálogos de confirmación para acciones críticas
-
-### 📊 Analíticas y Reportes
-
-- 📈 **Métricas del Sistema**:
-  - Total de versiones
-  - Versiones por mes
-  - Tiempo promedio de firma
-  - Tasa de éxito
-
-- 📉 **Gráficos Visuales**:
-  - Barras animadas por mes
-  - Estados actuales con porcentajes
-  - Tendencias de crecimiento
-
-### 🔧 Configuración
-
-- ⚙️ **Configuración General**: Parámetros del sistema
-- 👤 **Perfil de Usuario**: Gestión de datos personales
-- 🔔 **Notificaciones**: Preferencias de alertas
-- 🔒 **Seguridad**: Cambio de contraseña y 2FA
-- 🎨 **Apariencia**: Temas y personalización
+![Analytics](https://via.placeholder.com/800x450/1e1e2e/ffffff?text=Gr%C3%A1ficos+de+anal%C3%ADticas)
 
 ---
 
-## 🛠️ Stack Tecnológico
+## ✨ Características
 
-### Frontend
+### 🔄 Flujo automatizado completo
 
-| Tecnología | Versión | Propósito |
-|-----------|---------|-----------|
-| **React** | 18.2.0 | Framework principal UI |
-| **TypeScript** | 5.0.2 | Tipado estático |
-| **Vite** | 4.5.14 | Build tool y dev server |
-| **Tailwind CSS** | 3.4.0 | Framework CSS utility-first |
-| **Framer Motion** | 10.x | Animaciones y transiciones |
-| **React Router** | 6.20.0 | Enrutamiento SPA |
-| **Heroicons** | 2.0.18 | Sistema de iconos |
+1. **Crear versión** → Introduces datos básicos (cliente, terminal, versión)
+2. **Detecta proyecto** → Busca automáticamente `compile.py`, `Makefile` o archivos `.bin`
+3. **Compila BASE** → Ejecuta el comando de compilación
+4. **Calcula MD5 BASE** → Checksum automático del binario
+5. **Edita archivo .h** → Actualiza la versión en el código
+6. **Compila AUMENTO** → Genera nueva versión
+7. **Calcula MD5 AUMENTO** → Verifica que sea diferente a BASE
+8. **Crea estructura** → Carpetas BASE/AUMENTO + Checksums.txt + ReleaseNotes.md
+9. **Genera ZIP** → Comprime todo el historial
+10. **Abre Outlook** → Correo automático con adjuntos listos para enviar
 
-### Backend
+### 🎨 Interfaz moderna
 
-| Tecnología | Versión | Propósito |
-|-----------|---------|-----------|
-| **Spring Boot** | 3.2.0 | Framework backend |
-| **Java** | 17+ | Lenguaje del servidor |
-| **Flyway** | 9.x | Migraciones de BD |
-| **H2 Database** | 2.x | Base de datos en desarrollo |
-| **PostgreSQL** | 15+ | Base de datos en producción |
-| **Lombok** | 1.18.30 | Reducción de boilerplate |
-| **OpenAPI** | 3.0 | Documentación API |
+- **Glassmorphism** → Efectos de vidrio y transparencias
+- **Modo oscuro** → Detecta preferencia del sistema
+- **Bento Grid** → Diseño modular con tarjetas
+- **Animaciones suaves** → Framer Motion
+- **Responsive** → Adapta a cualquier tamaño de ventana
 
-### DevOps & Tools
+### 🔐 Gestión de versiones
 
-- **Docker**: Containerización de aplicaciones
-- **Docker Compose**: Orquestación multi-container
-- **Maven**: Gestión de dependencias Java
-- **npm**: Gestión de dependencias Node
-- **Git**: Control de versiones
-- **ESLint**: Linting JavaScript/TypeScript
-- **Prettier**: Formateo de código
+- **Estados:** Borrador → Listo → Certificado
+- **Búsqueda avanzada** → Filtra por cliente, terminal, fecha
+- **Edición inline** → Actualiza datos sin modal
+- **Historial completo** → Todas las versiones guardadas en BD
+
+### 🛠️ Compilación inteligente
+
+- **Detección automática** → Busca `compile.py`, `Makefile`, archivos `.bin`
+- **Múltiples modos** → Soporta Python scripts con menús interactivos
+- **Monitoreo de archivos** → Detecta cuando termina la compilación
+- **Validación** → Verifica que BASE ≠ AUMENTO (evita duplicados)
+
+### 📦 Historial estructurado
+
+```
+OneDrive/Versiones/
+└── VERSION_Cliente_v1.0.0_20251204/
+    ├── BASE/
+    │   └── firmware.bin
+    ├── AUMENTO/
+    │   └── firmware.bin
+    ├── Checksums.txt
+    ├── ReleaseNotes.md
+    └── VERSION_Cliente_v1.0.0_20251204.zip
+```
+
+---
+
+## 🚀 Instalación
+
+### Requisitos
+
+- **Node.js** 18+ ([descargar](https://nodejs.org/))
+- **Java** 17+ ([descargar](https://adoptium.net/))
+- **Maven** 3.8+ (incluido con Java)
+
+### Clonar el repositorio
+
+```bash
+git clone https://github.com/Sandovaliseth/versiones-app.git
+cd versiones-app
+```
+
+### Backend (Spring Boot API)
+
+```bash
+cd backend/versions-backend
+./mvnw clean install
+./mvnw spring-boot:run
+```
+
+✅ API corriendo en `http://localhost:8080`
+
+### Frontend (Electron App)
+
+En otra terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+✅ Aplicación Electron abierta automáticamente
+
+---
+
+## 💻 Uso
+
+### Desarrollo
+
+```bash
+# Frontend con hot-reload
+cd frontend
+npm run dev
+
+# Backend con auto-restart
+cd backend/versions-backend
+./mvnw spring-boot:run
+```
+
+### Producción
+
+```bash
+cd frontend
+npm run desktop
+```
+
+Esto ejecuta:
+1. `npm run build` → Compila TypeScript + Vite
+2. `npm run pack` → Empaqueta en `.exe` (carpeta `dist-electron/`)
+3. `npm run start` → Ejecuta el instalable
+
+### Comandos disponibles
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Desarrollo con Electron + hot-reload |
+| `npm run build` | Compila el código para producción |
+| `npm run pack` | Empaqueta en ejecutable `.exe` |
+| `npm run start` | Ejecuta el `.exe` empaquetado |
+| `npm run desktop` | Flujo completo: build + pack + start |
+| `npm run clean` | Limpia carpetas `dist/` y `dist-electron/` |
+
+---
+
+## 📝 Crear tu primera versión
+
+### 1. Abre la aplicación
+
+```bash
+npm run dev
+```
+
+### 2. Click en "Nueva Versión"
+
+Aparece el modal con el formulario.
+
+### 3. Llena los campos básicos
+
+- **Cliente:** Nombre del cliente (ej: "Bancolombia")
+- **Nombre versión cliente:** Identificador (ej: "v2.5.1")
+- **Terminal:** Modelo (ej: "VX520")
+- **Versión base:** Número de versión (ej: "1.0.0")
+- **Build:** Fecha automática (formato YYMMDD)
+
+### 4. Configuración de compilación (opcional)
+
+Si marcas **"Incluir versión AUMENTO"**:
+
+- **Ruta del proyecto:** Carpeta donde está tu código
+- **Comando compilación:** Se detecta automático (`py compile.py` o `make`)
+- **Archivo versión:** `.h` con `#define VERSION` (se busca automático)
+- **Versión aumento:** Nueva versión (ej: "1.0.1")
+
+### 5. Click en "Crear"
+
+La aplicación:
+
+1. ✅ Compila la versión BASE
+2. ✅ Calcula MD5 del binario
+3. ✅ Guarda snapshot del binario BASE
+4. ✅ Actualiza el archivo `.h` con nueva versión
+5. ✅ Compila la versión AUMENTO
+6. ✅ Calcula MD5 del nuevo binario
+7. ✅ Verifica que BASE ≠ AUMENTO
+8. ✅ Crea carpetas estructuradas
+9. ✅ Genera `Checksums.txt` y `ReleaseNotes.md`
+10. ✅ Comprime en ZIP
+11. ✅ Abre Outlook con correo pre-llenado
+
+### 6. Revisa el correo en Outlook
+
+Aparece un borrador con:
+- ✉️ Asunto: `[VERSION] Cliente - Terminal v1.0.0_20251204`
+- 📎 Adjunto: `VERSION_Cliente_v1.0.0_20251204.zip`
+- 📝 Cuerpo: Tabla HTML con checksums y detalles
+
+Solo agrega destinatarios y envía.
 
 ---
 
 ## 🏗️ Arquitectura
 
-### Arquitectura General
-
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        FRONTEND                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │   React     │  │  Tailwind   │  │   Framer    │         │
-│  │  Components │  │     CSS     │  │   Motion    │         │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘         │
-│         │                 │                 │                │
-│         └─────────────────┴─────────────────┘                │
-│                           │                                  │
-│                    ┌──────▼──────┐                          │
-│                    │ React Router│                          │
-│                    └──────┬──────┘                          │
-│                           │                                  │
-│                    ┌──────▼──────┐                          │
-│                    │  API Client │                          │
-│                    └──────┬──────┘                          │
-└───────────────────────────┼──────────────────────────────────┘
-                            │
-                     HTTP/REST API
-                            │
-┌───────────────────────────▼──────────────────────────────────┐
-│                        BACKEND                               │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Spring Boot Application                 │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐          │    │
-│  │  │   REST   │  │ Business │  │   Data   │          │    │
-│  │  │Controller│──│  Service │──│   Layer  │          │    │
-│  │  └──────────┘  └──────────┘  └─────┬────┘          │    │
-│  └────────────────────────────────────┼───────────────┘    │
-│                                        │                     │
-│                                 ┌──────▼──────┐             │
-│                                 │   Flyway    │             │
-│                                 │  Migrations │             │
-│                                 └──────┬──────┘             │
-│                                        │                     │
-│                                 ┌──────▼──────┐             │
-│                                 │   Database  │             │
-│                                 │ H2/PostreSQL│             │
-│                                 └─────────────┘             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Arquitectura Frontend - Estructura de Componentes
-
-```
-src/
-├── components/
-│   ├── layout/           # Componentes de estructura
-│   │   ├── MainLayout    # Layout principal con navegación
-│   │   └── BentoNavbar   # Navbar con Bento grid menu
-│   ├── ui/               # Componentes reutilizables
-│   │   ├── Card          # Tarjeta con glassmorphism
-│   │   ├── Button        # Botón con variantes
-│   │   ├── Input         # Input con validación
-│   │   ├── Badge         # Badge de estado
-│   │   └── ToastManager  # Sistema de notificaciones
-│   └── versiones/        # Componentes específicos
-│       ├── CrearVersionModal
-│       ├── VerVersionModal
-│       └── EditarVersionModal
-├── pages/                # Páginas principales
-│   ├── Dashboard         # Vista principal
-│   ├── Versions          # Gestión de versiones
-│   ├── Analytics         # Reportes y métricas
-│   └── Settings          # Configuración
-├── services/             # Servicios API
-│   └── versionService    # CRUD de versiones
-├── types/                # TypeScript types
-└── styles/               # Estilos globales
+┌─────────────────────────────────────┐
+│     Electron App (Frontend)          │
+│  ┌────────────────────────────────┐ │
+│  │  React + TypeScript + Tailwind │ │
+│  │  ┌──────────────────────────┐  │ │
+│  │  │ Dashboard │ Versions      │  │ │
+│  │  │ Analytics │ Settings      │  │ │
+│  │  └──────────────────────────┘  │ │
+│  └────────────────────────────────┘ │
+│                │                     │
+│         ┌──────▼──────────┐         │
+│         │ Electron IPC API │         │
+│         └──────┬──────────┘         │
+│                │                     │
+│    ┌───────────▼───────────────┐    │
+│    │ Sistema de archivos local │    │
+│    │ - Leer/escribir .bin, .h  │    │
+│    │ - Ejecutar compile.py     │    │
+│    │ - Calcular MD5            │    │
+│    │ - Integrar Outlook        │    │
+│    └───────────────────────────┘    │
+└─────────────────────────────────────┘
+                │
+         HTTP REST API
+                │
+┌───────────────▼─────────────────────┐
+│   Spring Boot Backend (API)         │
+│  ┌────────────────────────────────┐ │
+│  │ REST Controllers               │ │
+│  │  /api/versiones (CRUD)         │ │
+│  └──────────┬─────────────────────┘ │
+│             │                        │
+│  ┌──────────▼─────────────────────┐ │
+│  │ Business Services              │ │
+│  │  - Validación                  │ │
+│  │  - Lógica de negocio           │ │
+│  └──────────┬─────────────────────┘ │
+│             │                        │
+│  ┌──────────▼─────────────────────┐ │
+│  │ JPA Repository                 │ │
+│  └──────────┬─────────────────────┘ │
+│             │                        │
+│  ┌──────────▼─────────────────────┐ │
+│  │ H2 Database (dev)              │ │
+│  │ PostgreSQL (prod)              │ │
+│  └────────────────────────────────┘ │
+└─────────────────────────────────────┘
 ```
 
-### Arquitectura Backend - Clean Architecture
+### División de responsabilidades
 
-```
-com.lis.versions.versions_backend/
-├── common/
-│   ├── api/              # Global exception handlers
-│   │   ├── GlobalExceptionHandler
-│   │   ├── ApiError
-│   │   └── ResourceNotFoundException
-│   └── web/              # Filters y middleware
-│       └── CorrelationIdFilter
-├── versiones/
-│   ├── api/              # REST Controllers & DTOs
-│   │   ├── VersionController
-│   │   └── VersionDtos
-│   ├── app/              # Application Services
-│   │   └── VersionService
-│   ├── domain/           # Domain Models & Logic
-│   │   ├── Version
-│   │   └── VersionEstado
-│   └── infra/            # Infrastructure
-│       └── VersionRepository
-└── resources/
-    ├── application.yml   # Configuración
-    └── db/migration/     # Scripts Flyway
-        ├── V1__version_schema.sql
-        ├── V2__artefacto_module.sql
-        └── V3__borrador_module.sql
-```
+**Frontend (Electron):**
+- Interfaz de usuario (React + Tailwind)
+- Operaciones del sistema de archivos
+- Ejecutar comandos de compilación
+- Calcular checksums MD5
+- Integración con Outlook
+- Preferencias locales (localStorage)
+
+**Backend (Spring Boot):**
+- API REST para CRUD de versiones
+- Persistencia en base de datos
+- Validación de datos
+- Migraciones con Flyway
+- Documentación OpenAPI/Swagger
 
 ---
 
-## 💻 Instalación
+## 🛠️ Stack tecnológico
 
-### Prerrequisitos
+### Frontend
+- **React 18** → UI components
+- **TypeScript 5** → Type safety
+- **Electron 38** → Desktop wrapper
+- **Tailwind CSS 3** → Styling
+- **Framer Motion 10** → Animations
+- **React Router 6** → Routing
+- **Vite 4** → Build tool
 
-- **Node.js**: >= 18.0.0
-- **Java JDK**: >= 17
-- **Maven**: >= 3.8
-- **Git**: >= 2.30
-- **Docker** (opcional): >= 20.10
+### Backend
+- **Spring Boot 3.2** → Framework
+- **Java 17** → Language
+- **H2 Database** → Development DB
+- **PostgreSQL 15** → Production DB
+- **Flyway** → Database migrations
+- **Maven** → Build tool
+- **Lombok** → Boilerplate reduction
 
-### Instalación Frontend
-
-```bash
-# Clonar el repositorio
-git clone https://github.com/Sandovaliseth/versiones-app.git
-cd versiones-app/frontend
-
-# Instalar dependencias
-npm install
-
-# Configurar variables de entorno
-cp .env.example .env
-
-# Iniciar servidor de desarrollo
-npm run dev
-```
-
-El frontend estará disponible en `http://localhost:5173`
-
-### Instalación Backend
-
-```bash
-# Navegar al directorio backend
-cd backend/versions-backend
-
-# Construir el proyecto
-./mvnw clean install
-
-# Ejecutar la aplicación
-./mvnw spring-boot:run
-```
-
-El backend estará disponible en `http://localhost:8080`
-
-### Instalación con Docker
-
-```bash
-# Desde la raíz del proyecto
-cd infra
-
-# Levantar todos los servicios
-docker-compose up -d
-
-# Ver logs
-docker-compose logs -f
-
-# Detener servicios
-docker-compose down
-```
+### DevOps
+- **Docker** → Containerization
+- **Docker Compose** → Multi-container
+- **Git** → Version control
 
 ---
 
-## 📁 Estructura del Proyecto
+## 📂 Estructura del proyecto
 
 ```
 versiones-app/
-├── frontend/                    # Aplicación React
-│   ├── public/                  # Archivos estáticos
+├── frontend/                      # Aplicación Electron
+│   ├── electron/                  # Main process
+│   │   ├── main.cjs              # Entry point
+│   │   └── preload.cjs           # Bridge IPC
 │   ├── src/
-│   │   ├── components/          # Componentes React
-│   │   ├── pages/               # Páginas de la app
-│   │   ├── services/            # Servicios API
-│   │   ├── styles/              # Estilos globales
-│   │   ├── types/               # TypeScript types
-│   │   ├── App.tsx              # Componente raíz
-│   │   └── main.tsx             # Entry point
+│   │   ├── components/           # React components
+│   │   │   ├── layout/          # MainLayout, BentoNavbar
+│   │   │   ├── ui/              # Card, Button, Badge
+│   │   │   └── versiones/       # CrearVersionModal
+│   │   ├── pages/               # Dashboard, Versions, Analytics
+│   │   ├── services/            # API client (axios)
+│   │   ├── types/               # TypeScript definitions
+│   │   └── styles/              # Global CSS
 │   ├── package.json
-│   ├── tsconfig.json
-│   ├── vite.config.ts
-│   └── tailwind.config.js
+│   └── vite.config.ts
 │
 ├── backend/
-│   └── versions-backend/        # API Spring Boot
-│       ├── src/
-│       │   ├── main/
-│       │   │   ├── java/        # Código fuente
-│       │   │   └── resources/   # Configuración
-│       │   └── test/            # Tests
-│       ├── pom.xml
-│       └── Dockerfile
+│   └── versions-backend/         # Spring Boot API
+│       ├── src/main/java/
+│       │   └── com/lis/versions/
+│       │       ├── versiones/   # Domain module
+│       │       │   ├── api/     # REST controllers
+│       │       │   ├── app/     # Services
+│       │       │   ├── domain/  # Entities
+│       │       │   └── infra/   # Repositories
+│       │       └── common/      # Shared utilities
+│       ├── src/main/resources/
+│       │   ├── application.yml
+│       │   └── db/migration/    # Flyway scripts
+│       └── pom.xml
 │
-├── infra/                       # Infraestructura
-│   ├── docker-compose.yml       # Orquestación Docker
-│   └── .env.example             # Variables de entorno
+├── infra/
+│   └── docker-compose.yml        # PostgreSQL + pgAdmin
 │
-├── docs/                        # Documentación
-│   ├── design.md                # Diseño UI/UX
-│   └── architecture.pdf         # Arquitectura técnica
-│
-└── README.md                    # Este archivo
+├── docs/                         # Documentación técnica
+└── README.md
 ```
 
 ---
 
-## 🚀 Desarrollo
+## 🌐 API REST
 
-### Scripts Disponibles - Frontend
+El backend expone una API REST en `http://localhost:8080`
 
-```json
-{
-  "dev": "vite",                    // Servidor de desarrollo
-  "build": "tsc && vite build",     // Build de producción
-  "preview": "vite preview",        // Preview del build
-  "lint": "eslint . --ext ts,tsx",  // Linting
-  "format": "prettier --write ."    // Formateo de código
-}
+### Endpoints principales
+
+```http
+GET    /api/versiones              # Listar todas las versiones
+GET    /api/versiones/{id}         # Obtener una versión por ID
+POST   /api/versiones              # Crear nueva versión
+PUT    /api/versiones/{id}         # Actualizar versión existente
+DELETE /api/versiones/{id}         # Eliminar versión
+POST   /api/versiones/{id}/firmar  # Cambiar estado a "Certificado"
 ```
 
-### Ejecutar en Desarrollo
+### Documentación interactiva
+
+**Swagger UI:** http://localhost:8080/swagger-ui.html
+
+Prueba todos los endpoints desde el navegador.
+
+---
+
+## 🤝 Contribuir
 
 ```bash
-# Terminal 1 - Backend
-cd backend/versions-backend
-./mvnw spring-boot:run
+# Fork del repo
+git clone https://github.com/TU_USUARIO/versiones-app.git
 
-# Terminal 2 - Frontend
-cd frontend
-npm run dev
+# Crear rama
+git checkout -b feature/nueva-funcionalidad
+
+# Hacer cambios y commit
+git add .
+git commit -m "feat: agregar nueva funcionalidad"
+
+# Push y Pull Request
+git push origin feature/nueva-funcionalidad
 ```
 
-### Build de Producción
+### Convenciones de commits
 
-```bash
-# Frontend
-cd frontend
-npm run build
-# Output en: frontend/dist/
+Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
 
-# Backend
-cd backend/versions-backend
-./mvnw clean package
-# Output en: target/versions-backend-0.0.1-SNAPSHOT.jar
-```
+- `feat:` Nueva funcionalidad
+- `fix:` Corrección de bug
+- `docs:` Cambios en documentación
+- `style:` Formato (sin cambios de código)
+- `refactor:` Refactorización
+- `test:` Tests
+- `chore:` Tareas de mantenimiento
 
 ---
 
-## 📚 API Documentation
+## 📄 Licencia
 
-### Endpoints Principales
-
-#### Versiones
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| `GET` | `/api/versiones` | Listar todas las versiones |
-| `GET` | `/api/versiones/{id}` | Obtener versión por ID |
-| `POST` | `/api/versiones` | Crear nueva versión |
-| `PUT` | `/api/versiones/{id}` | Actualizar versión |
-| `DELETE` | `/api/versiones/{id}` | Eliminar versión |
-| `POST` | `/api/versiones/{id}/firmar` | Firmar versión |
-
-#### Swagger UI
-
-Documentación interactiva disponible en:
-```
-http://localhost:8080/swagger-ui.html
-```
-
-#### OpenAPI Spec
-
-Especificación OpenAPI 3.0:
-```
-http://localhost:8080/v3/api-docs
-```
-
-### Ejemplo de Request
-
-```bash
-# Crear versión
-curl -X POST http://localhost:8080/api/versiones \
-  -H "Content-Type: application/json" \
-  -d '{
-    "cliente": "Cliente Demo",
-    "nombreVersionCliente": "v1.0.0",
-    "terminal": "Terminal 1",
-    "serie": "A001",
-    "sistemaOperativo": "Windows 11",
-    "versionSoftware": "2.5.1",
-    "observaciones": "Release inicial"
-  }'
-```
+MIT License - ver [LICENSE](LICENSE)
 
 ---
 
-## 🧪 Testing
+## 👤 Autor
 
-### Frontend Tests
-
-```bash
-cd frontend
-
-# Ejecutar tests unitarios
-npm run test
-
-# Tests con coverage
-npm run test:coverage
-
-# Tests E2E
-npm run test:e2e
-```
-
-### Backend Tests
-
-```bash
-cd backend/versions-backend
-
-# Ejecutar todos los tests
-./mvnw test
-
-# Tests con coverage
-./mvnw verify
-
-# Tests de integración
-./mvnw integration-test
-```
+**@Sandovaliseth**
 
 ---
 
-## 🎨 Guía de Estilo
+<div align="center">
 
-### Convenciones de Código
+**¿Te gusta el proyecto? Dale una ⭐ en GitHub**
 
-- **TypeScript/React**: Seguir [Airbnb Style Guide](https://github.com/airbnb/javascript)
-- **Java**: Seguir [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html)
-- **Commits**: Seguir [Conventional Commits](https://www.conventionalcommits.org/)
-
-### Formato de Commits
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-Tipos válidos:
-- `feat`: Nueva funcionalidad
-- `fix`: Corrección de bugs
-- `docs`: Cambios en documentación
-- `style`: Cambios de formato (no afectan el código)
-- `refactor`: Refactorización de código
-- `test`: Agregar o modificar tests
-- `chore`: Tareas de mantenimiento
-
----
-
-## 🤝 Contribución
-
-¡Las contribuciones son bienvenidas! Por favor sigue estos pasos:
-
-1. Fork el proyecto
-2. Crea tu rama de feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'feat: Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
----
-
-## 📝 Licencia
-
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
-
----
-
-## 👥 Equipo
-
-- **Desarrollador Principal**: @Sandovaliseth
-- **Arquitecto de Software**: GitHub Copilot AI
-- **Diseño UI/UX**: Sistema Bento Grid 2025
-
----
-
-## 📞 Contacto
+</div>
 
 - **GitHub**: [@Sandovaliseth](https://github.com/Sandovaliseth)
 - **Proyecto**: [versiones-app](https://github.com/Sandovaliseth/versiones-app)

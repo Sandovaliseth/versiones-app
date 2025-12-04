@@ -235,8 +235,16 @@ const resolveProjectFilePath = (projectRoot?: string, relativeOrAbsolute?: strin
   return `${normalizedRoot}\\${sanitizedRelative}`;
 };
 
-const sanitizePathSegment = (value?: string) => {
+const sanitizePathSegment = (value?: string, preserveDots: boolean = false) => {
   if (!value) return '';
+  if (preserveDots) {
+    // Preservar puntos para versiones (2.0.0 se mantiene como 2.0.0)
+    return value
+      .normalize('NFD')
+      .replace(/[^\w\d.\-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 80);
+  }
   return value
     .normalize('NFD')
     .replace(/[^\w\d-]+/g, '_')
@@ -246,7 +254,7 @@ const sanitizePathSegment = (value?: string) => {
 
 const buildHistorialFolderName = (data: CrearVersionData) => {
   const cliente = sanitizePathSegment(data.nombreVersionCliente || data.cliente || 'VERSION');
-  const base = sanitizePathSegment(data.versionBase || '0');
+  const base = sanitizePathSegment(data.versionBase || '0', true); // preservar puntos en versión
   const build = sanitizePathSegment(data.build || getTodayYYMMDD());
   return `VERSION_${cliente}${base}_${build}`;
 };
@@ -352,6 +360,7 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   const historialFolderRef = useRef<string | null>(null);
   const historialZipRef = useRef<string | null>(null);
   const lastMonitoredMd5Ref = useRef<string | null>(null);
+  const lastMonitoredMtimeRef = useRef<number | null>(null);
   const checksumErrorShownRef = useRef<boolean>(false);
   const parsedErrorMessage = useMemo(() => {
     const paragraphs: string[] = [];
@@ -384,24 +393,12 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
 
   // Nota: se removió el cálculo de monitoredBinPath no utilizado
 
-  const handleCopyErrorPath = async (value: string) => {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedErrorPath(true);
-      setTimeout(() => setCopiedErrorPath(false), 1500);
-    } catch (copyError) {
-      console.warn('No se pudo copiar la ruta del error:', copyError);
-    }
-  };
+
 
   const showChecksumIdenticalError = () => {
     if (checksumErrorShownRef.current) return;
-    setErrorModal({
-      show: true,
-      title: 'Checksums idénticos',
-      message: CHECKSUM_RECOMPILE_MESSAGE
-    });
+    // Mostrar advertencia en el modal de espera (no en el modal global de error)
+    setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
     checksumErrorShownRef.current = true;
   };
 
@@ -436,13 +433,24 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     return folderPath;
   };
 
-  const actualizarChecksumsFile = async (folderPath: string, md5Base?: string, md5Aumento?: string) => {
+  const actualizarChecksumsFile = async (
+    folderPath: string,
+    md5Base?: string,
+    md5Aumento?: string,
+    baseFolderName?: string,
+    aumentoFolderName?: string
+  ) => {
     if (!window.electronAPI || !folderPath) return;
-    const checksumBaseLine = `CHECKSUM BASE: ${md5Base || 'PENDIENTE'}`;
-    const checksumAumentoLine = `CHECKSUM AUMENTO: ${md5Aumento || 'PENDIENTE'}`;
+    const baseName = baseFolderName || 'BASE';
+    const aumentoName = aumentoFolderName || 'AUMENTO';
+    const checksumBaseLine = `${baseName}: ${md5Base || 'PENDIENTE'}`;
+    const checksumAumentoLine = `${aumentoName}: ${md5Aumento || 'PENDIENTE'}`;
+    const checksumsContent = md5Aumento
+      ? `${checksumBaseLine}\n${checksumAumentoLine}\n`
+      : `${checksumBaseLine}\n`;
     await window.electronAPI.writeTextFile(
       `${folderPath}\\Checksums.txt`,
-      `${checksumBaseLine}\n${checksumAumentoLine}\n`
+      checksumsContent
     );
   };
 
@@ -473,8 +481,10 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       if (!exists) return;
       const folderPath = historialFolderRef.current || await ensureHistorialFolder();
       if (!folderPath) return;
-      await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\BASE\\${formData.nombreArchivoBin}`);
-      await actualizarChecksumsFile(folderPath, checksumBase, undefined);
+      // Usar nombre dinámico: nombreVersionCliente + versionBase
+      const baseFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionBase}`;
+      await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${baseFolderName}\\${formData.nombreArchivoBin}`);
+      await actualizarChecksumsFile(folderPath, checksumBase, undefined, baseFolderName, undefined);
     } catch (snapshotError) {
       console.warn('No se pudo guardar el binario BASE en el historial:', snapshotError);
     }
@@ -489,21 +499,25 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       return { folderPath, zipPath: null };
     }
     const sourceBinPath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
+    
+    // Nombres dinámicos de carpetas
+    const baseFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionBase}`;
+    const aumentoFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionAumento}`;
 
     try {
       const exists = await window.electronAPI.fileExists(sourceBinPath);
       
       // Copiar archivo BASE si existe y tenemos checksum BASE
       if (exists && md5Base && !md5Aumento) {
-        await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\BASE\\${formData.nombreArchivoBin}`);
+        await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${baseFolderName}\\${formData.nombreArchivoBin}`);
       }
       
       // Copiar archivo AUMENTO si existe y tenemos checksum AUMENTO
       if (exists && md5Aumento) {
-        await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\AUMENTO\\${formData.nombreArchivoBin}`);
+        await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${aumentoFolderName}\\${formData.nombreArchivoBin}`);
       }
       
-      await actualizarChecksumsFile(folderPath, md5Base, md5Aumento);
+      await actualizarChecksumsFile(folderPath, md5Base, md5Aumento, baseFolderName, md5Aumento ? aumentoFolderName : undefined);
       const zipPath = await zipHistorialFolder(folderPath);
       return { folderPath, zipPath };
     } catch (historialError) {
@@ -535,54 +549,13 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     }
   }, [errorModal.show, copiedErrorPath]);
 
-  useEffect(() => {
-    if (!supportsProjectLookup) {
-      return;
-    }
-
-    const projectPath = formData.rutaProyecto?.trim();
-    const binName = formData.nombreArchivoBin?.trim();
-    const headerName = formData.archivoVersion?.trim();
-
-    if (!projectPath || (!binName && !headerName)) {
-      setArtifactHints({ binPath: null, headerPath: null, isSearching: false });
-      return;
-    }
-
-    let cancelled = false;
-    setArtifactHints((prev) => ({ ...prev, isSearching: true }));
-
-    const timer = setTimeout(async () => {
-      if (cancelled || !window.electronAPI?.findFiles) {
-        setArtifactHints({ binPath: null, headerPath: null, isSearching: false });
-        return;
-      }
-
-      try {
-        const [binResult, headerResult] = await Promise.all([
-          binName ? window.electronAPI.findFiles(projectPath, [binName]) : null,
-          headerName ? window.electronAPI.findFiles(projectPath, [headerName]) : null
-        ]);
-
-        if (cancelled) return;
-
-        setArtifactHints({
-          binPath: getFirstMatchPath(binResult),
-          headerPath: getFirstMatchPath(headerResult),
-          isSearching: false
-        });
-      } catch (lookupError) {
-        if (cancelled) return;
-        console.warn('No se pudieron detectar los artefactos automáticamente:', lookupError);
-        setArtifactHints({ binPath: null, headerPath: null, isSearching: false });
-      }
-    }, 400);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [supportsProjectLookup, formData.rutaProyecto, formData.nombreArchivoBin, formData.archivoVersion]);
+  // Detección de archivos deshabilitada - solo se detecta al crear/finalizar
+  // useEffect(() => {
+  //   if (!supportsProjectLookup) {
+  //     return;
+  //   }
+  //   ...
+  // }, [supportsProjectLookup, formData.rutaProyecto, formData.nombreArchivoBin, formData.archivoVersion]);
 
   const includeAumentoCert = formData.incluirVersionAumento ?? false;
   
@@ -591,12 +564,26 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
 
   // Pistas bajo el campo .bin deshabilitadas según solicitud del usuario
 
-  const shouldShowHeaderHint = Boolean(
-    supportsProjectLookup &&
-    formData.rutaProyecto &&
-    formData.archivoVersion &&
-    (artifactHints.isSearching || artifactHints.headerPath)
-  );
+  const handleWebFolderSelect = (files: FileList | null) => {
+    if (!files || files.length === 0) {
+      return;
+    }
+    const names = Array.from(files).map(f => f.name.toLowerCase());
+    const hasCompilePy = names.some(n => n === 'compile.py');
+    const hasMakefile = names.some(n => n === 'makefile');
+    const binCandidates = Array.from(new Set(names.filter(n => n.endsWith('.bin'))));
+    setFormData(prev => {
+      const next = { ...prev };
+      if (!prev.comandoCompilacion) {
+        next.comandoCompilacion = hasCompilePy ? 'py compile.py' : (hasMakefile ? 'make' : prev.comandoCompilacion);
+      }
+      if (!prev.nombreArchivoBin && binCandidates.length > 0) {
+        const best = binCandidates.sort((a,b)=>b.length-a.length)[0];
+        next.nombreArchivoBin = best || prev.nombreArchivoBin;
+      }
+      return next;
+    });
+  };
 
   const resolveVersionesBasePath = () => {
     if (formData.rutaLocal && formData.rutaLocal.trim()) {
@@ -730,21 +717,19 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       let content = result.content;
       let updated = false;
       
-      // Pattern 1: #define VERSION "X.Y.Z"
-      if (/#define\s+VERSION\s+"[\d.]+"/.test(content)) {
-        content = content.replace(
-          /#define\s+VERSION\s+"[\d.]+"/g,
-          `#define VERSION "${newVersion}"`
-        );
+      // Pattern 1: #define VERSION "X.Y.Z" (preservar espacios)
+      const versionLinePattern = /(^\s*#define\s+VERSION\s+)("[^"]+")/gm;
+      if (versionLinePattern.test(content)) {
+        content = content.replace(versionLinePattern, (_full: string, prefix: string) => `${prefix}"${newVersion}"`);
         updated = true;
       }
       
       // Pattern 2: #define VERSION_MAJOR/MINOR/PATCH
       const [major, minor, patch] = newVersion.split('.');
       if (/#define\s+VERSION_MAJOR/.test(content)) {
-        if (major) content = content.replace(/#define\s+VERSION_MAJOR\s+\d+/g, `#define VERSION_MAJOR ${major}`);
-        if (minor) content = content.replace(/#define\s+VERSION_MINOR\s+\d+/g, `#define VERSION_MINOR ${minor}`);
-        if (patch) content = content.replace(/#define\s+VERSION_PATCH\s+\d+/g, `#define VERSION_PATCH ${patch}`);
+        if (major) content = content.replace(/(^\s*#define\s+VERSION_MAJOR\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${major}`);
+        if (minor) content = content.replace(/(^\s*#define\s+VERSION_MINOR\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${minor}`);
+        if (patch) content = content.replace(/(^\s*#define\s+VERSION_PATCH\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${patch}`);
         updated = true;
       }
       
@@ -780,16 +765,14 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
         const prefixMatch = match.currentValue.match(/^([A-Za-z_]*)/);
         const prefix = prefixMatch ? prefixMatch[1] : '';
         
-        // Ajustar delimitadores según el valor actual (si usa "_" convertir puntos a guiones bajos)
-        const usesUnderscore = match.currentValue.includes('_');
-        const normalizedNew = usesUnderscore ? newVersion.replace(/\./g, '_') : newVersion;
-        const newMainVer = prefix ? `${prefix}${normalizedNew}` : normalizedNew;
+        // Usar la versión exactamente como la ingresó el usuario (mantener puntos)
+        const newMainVer = prefix ? `${prefix}${newVersion}` : newVersion;
         
         console.log(`Actualizando ${match.varName}: "${match.currentValue}" -> "${newMainVer}"`);
         
-        // Reemplazar específicamente esta variable
-        const replacePattern = new RegExp(`#define\\s+${match.varName}\\s+"[^"]+"`, 'g');
-        content = content.replace(replacePattern, `#define ${match.varName} "${newMainVer}"`);
+        // Reemplazar solo el valor entre comillas (preservar espacios)
+        const replacePattern = new RegExp(`(^\\s*#define\\s+${match.varName}\\s+)"[^"]+"`, 'gm');
+        content = content.replace(replacePattern, (_m: string, p1: string) => `${p1}"${newMainVer}"`);
         updated = true;
       }
 
@@ -804,11 +787,10 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
         if (nqMatches.length > 0) {
           const m = nqMatches[0];
           const prefix = (m.currentValue.match(/^([A-Za-z_]*)/) || ['',''])[1];
-          const usesUnderscore = m.currentValue.includes('_');
-          const normalizedNew = usesUnderscore ? newVersion.replace(/\./g, '_') : newVersion;
-          const replacement = `#define ${m.varName} ${prefix ? prefix + normalizedNew : normalizedNew}`;
-          console.log(`Actualizando ${m.varName}: ${m.currentValue} -> ${prefix ? prefix + normalizedNew : normalizedNew}`);
-          const replacePattern = new RegExp(`#define\\s+${m.varName}\\s+[A-Za-z_]*\\d+_\\d+(?:_\\d+)?`, 'g');
+          // Mantener la versión exactamente como el usuario la ingresó
+          const replacement = `#define ${m.varName} ${prefix ? prefix + newVersion : newVersion}`;
+          console.log(`Actualizando ${m.varName}: ${m.currentValue} -> ${prefix ? prefix + newVersion : newVersion}`);
+          const replacePattern = new RegExp(`#define\\s+${m.varName}\\s+[A-Za-z_]*\\d+[._]\\d+(?:[._]\\d+)?`, 'g');
           content = content.replace(replacePattern, replacement);
           updated = true;
         }
@@ -842,13 +824,12 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
         console.log(`Detectado #define ${match.varName} con fecha: ${match.currentValue}`);
         console.log(`Actualizando ${match.varName} a fecha actual: ${dateStr}`);
         
-        // Reemplazar específicamente esta variable
-        const replacePattern = new RegExp(`#define\\s+${match.varName}\\s+"\\d{8}"`, 'g');
-        content = content.replace(replacePattern, `#define ${match.varName} "${dateStr}"`);
+        // Reemplazar específicamente el valor entre comillas (preservar espacios)
+        const replacePattern = new RegExp(`(^\\s*#define\\s+${match.varName}\\s+)"\\d{8}"`, 'gm');
+        content = content.replace(replacePattern, (_m: string, p1: string) => `${p1}"${dateStr}"`);
         updated = true;
       }
       
-      // Pattern 5: Detectar otras variables tipo versión (solo informativo, no se modifican)
       const otherVerPattern = /#define\s+([A-Z_]+(?:PARAM|CONFIG|BUILD)(?:_VERSION)?)\s+"([^"]+)"/g;
       let otherMatch;
       while ((otherMatch = otherVerPattern.exec(content)) !== null) {
@@ -856,19 +837,14 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       }
       
       if (!updated) {
-        // Fallback conservador: si encontramos una constante que contenga VER o VERSION y tenga una cadena con dígitos tipo 1.2.3 o 1_2_3, reemplazamos solo esa parte
-        const fallbackPattern = /#define\s+([A-Z_]*VER[A-Z_]*|VERSION[A-Z_]*)\s+"([^"\n]*?)(\d+(?:[._]\d+){1,3})([^"\n]*)"/g;
+        const fallbackPattern = /(^\s*#define\s+([A-Z_]*VER[A-Z_]*|VERSION[A-Z_]*)\s+)"([^"\n]*?)(\d+(?:[._]\d+){1,3})([^"\n]*)"/gm;
         let fbMatch = fallbackPattern.exec(content);
         if (fbMatch) {
-          const varName = fbMatch[1];
-          const before = fbMatch[2] || '';
-          const currentVer = fbMatch[3] || '';
-          const after = fbMatch[4] || '';
-          const usesUnderscore = currentVer.includes('_');
-          const normalizedNew = usesUnderscore ? newVersion.replace(/\./g, '_') : newVersion;
-          const newValue = `#define ${varName} "${before}${normalizedNew}${after}"`;
-          const pattern = new RegExp(`#define\\s+${varName}\\s+"[^"\n]*?${currentVer}[^"\n]*?"`);
-          content = content.replace(pattern, newValue);
+          const prefix = fbMatch[1];
+          const pre = fbMatch[3] || '';
+          const post = fbMatch[5] || '';
+          // Mantener la versión exactamente como el usuario la ingresó
+          content = content.replace(fallbackPattern, `${prefix}"${pre}${newVersion}${post}"`);
           updated = true;
         }
       }
@@ -892,7 +868,6 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     }
   };
 
-  // Función para capturar pantalla del ejecutable
   const capturarPantalla = async (carpetaBase: string): Promise<void> => {
     try {
       if (!window.electronAPI) {
@@ -918,7 +893,6 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     }
   };
 
-  // Crear correo en Outlook (delegando la generación de HTML al helper modular)
   const crearCorreoOutlook = async (
     md5Aumento: string | '',
     carpetaOneDrive?: string | null,
@@ -932,20 +906,13 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
 
       const { subject, body } = crearCorreoHtml(formData as any, md5Aumento || undefined, carpetaOneDrive || null, formData.checksumBase);
 
+      // Solo adjuntar el ZIP del historial
       const attachments: string[] = [];
       if (historialZipPath && await window.electronAPI.fileExists(historialZipPath)) {
         attachments.push(historialZipPath);
-      }
-      if (carpetaOneDrive) {
-        const baseFilePath = `${carpetaOneDrive}\\BASE\\${formData.nombreArchivoBin}`;
-        if (await window.electronAPI.fileExists(baseFilePath)) attachments.push(baseFilePath);
-        if (md5Aumento) {
-          const aumentoFilePath = `${carpetaOneDrive}\\AUMENTO\\${formData.nombreArchivoBin}`;
-          if (await window.electronAPI.fileExists(aumentoFilePath)) attachments.push(aumentoFilePath);
-        }
+        console.log(`✅ Adjuntando ZIP del historial: ${historialZipPath}`);
       } else {
-        const binPath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
-        if (await window.electronAPI.fileExists(binPath)) attachments.push(binPath);
+        console.warn('⚠️ No se encontró el ZIP del historial para adjuntar');
       }
 
       const resultado = await window.electronAPI.createOutlookDraft({
@@ -968,6 +935,23 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       return '';
     }
   };
+
+  // Función centralizada para crear email con manejo de progress
+  const handleCreateEmail = async (md5Aumento: string | '', historialZipPath?: string | null): Promise<string> => {
+    setProgressStep('📧 Generando correo en Outlook...');
+    const asuntoCorreo = await crearCorreoOutlook(md5Aumento, undefined, historialZipPath);
+    return asuntoCorreo;
+  };
+
+  // Reiniciar monitoreo de compilación cuando cambia la versión de AUMENTO manualmente
+  useEffect(() => {
+    if (waitingForAumentoCompile) {
+      setCompilationDetected(false);
+      setChecksumWarning('');
+      checksumErrorShownRef.current = false;
+      startFileMonitoring();
+    }
+  }, [formData.versionAumento]);
 
   // Función para iniciar monitoreo de respuesta de correo
   const iniciarMonitoreoRespuesta = (asuntoCorreo: string): void => {
@@ -1143,7 +1127,19 @@ ${formData.linksOneDrive || 'N/A'}
 
     (async () => {
       try {
-        lastMonitoredMd5Ref.current = await window.electronAPI.computeMd5(binFilePath);
+        const stat = await window.electronAPI.getFileStat(binFilePath);
+        lastMonitoredMtimeRef.current = stat?.ok ? (stat.mtimeMs ?? null) : null;
+      } catch {
+        lastMonitoredMtimeRef.current = null;
+      }
+      try {
+        // Capturar MD5 actual del bin monitoreado
+        const md5Initial = await window.electronAPI.computeMd5(binFilePath);
+        lastMonitoredMd5Ref.current = md5Initial;
+        // Si no existe checksum BASE aún, usar el MD5 actual como referencia BASE
+        if (!formData.checksumBase && md5Initial) {
+          setFormData(prev => ({ ...prev, checksumBase: md5Initial! }));
+        }
       } catch {
         lastMonitoredMd5Ref.current = null;
       }
@@ -1151,26 +1147,59 @@ ${formData.linksOneDrive || 'N/A'}
 
     checkFileIntervalRef.current = setInterval(async () => {
       try {
+        const stat = await window.electronAPI.getFileStat(binFilePath);
+        const mtime = stat?.ok ? (stat.mtimeMs ?? null) : null;
         const md5Current = await window.electronAPI.computeMd5(binFilePath);
         if (!md5Current) return;
 
-        if (lastMonitoredMd5Ref.current && md5Current !== lastMonitoredMd5Ref.current) {
+        const mtimeChanged = Boolean(
+          typeof mtime === 'number' && typeof lastMonitoredMtimeRef.current === 'number' && mtime !== lastMonitoredMtimeRef.current
+        );
+        const md5Changed = Boolean(lastMonitoredMd5Ref.current && md5Current !== lastMonitoredMd5Ref.current);
+
+        console.log('🔍 Monitoreo:', {
+          mtimeChanged,
+          md5Changed,
+          md5Current: md5Current.substring(0, 8),
+          checksumBase: formData.checksumBase?.substring(0, 8),
+          sonIguales: md5Current === formData.checksumBase
+        });
+
+        // Si detectamos cambio en el archivo (por mtime o MD5)
+        if (mtimeChanged || md5Changed) {
+          console.log('🔔 Cambio detectado en el archivo - Nueva compilación detectada');
+          
+          // IMPORTANTE: Limpiar advertencia previa al detectar nueva compilación
+          setChecksumWarning('');
+          checksumErrorShownRef.current = false;
+          
+          // Verificar si el MD5 actual es igual al BASE
           if (formData.checksumBase && md5Current === formData.checksumBase) {
+            console.log('❌ CHECKSUMS IDÉNTICOS - Compilación inválida');
+            // Checksum idéntico al BASE: mostrar advertencia clara
             setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
             setCompilationDetected(false);
             showChecksumIdenticalError();
           } else {
-            setChecksumWarning('');
-            setCompilationDetected(true);
-            if (checkFileIntervalRef.current) {
-              clearInterval(checkFileIntervalRef.current);
-              checkFileIntervalRef.current = null;
+            console.log('✅ MD5 diferente al BASE - Compilación válida');
+            // MD5 es diferente al BASE: habilitar y limpiar advertencias
+            if (md5Changed) {
+              console.log('✅ Habilitando botón Finalizar');
+              setChecksumWarning('');
+              checksumErrorShownRef.current = false;
+              setCompilationDetected(true);
+              if (checkFileIntervalRef.current) {
+                clearInterval(checkFileIntervalRef.current);
+                checkFileIntervalRef.current = null;
+              }
             }
           }
         }
 
+        lastMonitoredMtimeRef.current = mtime;
         lastMonitoredMd5Ref.current = md5Current;
-      } catch {
+      } catch (err) {
+        console.error('❌ Error en monitoreo:', err);
       }
     }, 1000);
   };
@@ -1394,19 +1423,34 @@ ${formData.linksOneDrive || 'N/A'}
         const binFilePath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
         let md5Base: string | null = null;
 
-        md5Base = await window.electronAPI.computeMd5(binFilePath);
-        
-        if (!md5Base) {
-          setShowProgressModal(false);
-          setIsCalculatingChecksums(false);
-          isSubmittingRef.current = false;
-          setErrorModal({ show: true, title: '❌ Archivo no encontrado', message: `No se encontró el archivo .bin en la ruta:\n\n${binFilePath}\n\nVerifica que hayas compilado la versión BASE correctamente.` });
-          return;
+        // En modo Electron, calcular MD5; en modo web, usar valor manual si existe
+        if (window.electronAPI?.computeMd5) {
+          md5Base = await window.electronAPI.computeMd5(binFilePath);
+          if (!md5Base) {
+            setShowProgressModal(false);
+            setIsCalculatingChecksums(false);
+            isSubmittingRef.current = false;
+            setErrorModal({ show: true, title: '❌ Archivo no encontrado', message: `No se encontró el archivo .bin en la ruta:\n\n${binFilePath}\n\nVerifica que hayas compilado la versión BASE correctamente.` });
+            return;
+          }
+          console.log('✅ MD5 BASE calculado:', md5Base);
+        } else {
+          // Modo web: usar checksum manual ingresado
+          md5Base = formData.checksumBase || null;
+          if (!md5Base) {
+            setShowProgressModal(false);
+            setIsCalculatingChecksums(false);
+            isSubmittingRef.current = false;
+            setErrorModal({ show: true, title: '❌ Falta checksum BASE', message: 'En modo web, debes ingresar manualmente el checksum BASE (MD5) del archivo .bin compilado.' });
+            return;
+          }
+          console.log('✅ MD5 BASE manual:', md5Base);
         }
         
-        console.log('✅ MD5 BASE:', md5Base);
         setFormData(prev => ({ ...prev, checksumBase: md5Base! }));
-        await snapshotBaseBinary(binFilePath, md5Base);
+        if (window.electronAPI) {
+          await snapshotBaseBinary(binFilePath, md5Base);
+        }
 
         setShowProgressModal(false);
         setIsCalculatingChecksums(false);
@@ -1714,7 +1758,6 @@ ${formData.linksOneDrive || 'N/A'}
 
       setProgressStep('📸 Capturando pantalla automáticamente...');
       if (carpetaCreada) {
-        await new Promise(resolve => setTimeout(resolve, 500));
         await capturarPantalla(carpetaCreada);
       }
 
@@ -1726,12 +1769,7 @@ ${formData.linksOneDrive || 'N/A'}
       setProgressStep('🗺️ Actualizando Roadmap...');
       await actualizarRoadmap();
 
-      setProgressStep('📧 Generando correo en Outlook...');
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const asuntoCorreo = await crearCorreoOutlook(md5Aumento, carpetaCreada, historialZipPath || undefined);
-      if (asuntoCorreo) {
-        await new Promise(resolve => setTimeout(resolve, 1800));
-      }
+      const asuntoCorreo = await handleCreateEmail(md5Aumento, historialZipPath || undefined);
 
       setProgressStep('✅ Proceso completado - Correo creado');
       setIsCalculatingChecksums(false);
@@ -1769,13 +1807,7 @@ ${formData.linksOneDrive || 'N/A'}
       setShowProgressModal(true);
       setProgressStep('📦 Actualizando historial y ZIP...');
       const historialInfo = await registrarAumentoEnHistorial(formData.checksumBase);
-      setProgressStep('📧 Generando correo en Outlook...');
-      await new Promise(resolve => setTimeout(resolve, 600));
-      const carpeta = await crearEstructuraCarpetas(formData.checksumBase);
-      const asunto = await crearCorreoOutlook('', carpeta, historialInfo.zipPath || undefined);
-      if (asunto) {
-        await new Promise(resolve => setTimeout(resolve, 1800));
-      }
+      await handleCreateEmail('', historialInfo.zipPath || undefined);
     } catch (e) {
       console.warn('No fue posible crear correo automáticamente:', e);
     } finally {
@@ -1809,32 +1841,20 @@ ${formData.linksOneDrive || 'N/A'}
     }
 
     if (formData.checksumBase === md5Aumento) {
-      console.log('⚠️ Checksums idénticos en Finalizar manual');
-      console.log('BASE:', formData.checksumBase);
-      console.log('AUMENTO:', md5Aumento);
       setShowProgressModal(false);
       setIsCalculatingChecksums(false);
-      setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
+      setChecksumWarning('');
       setCompilationDetected(false);
-      showChecksumIdenticalError();
+      setErrorModal({
+        show: true,
+        title: '⚠️ Checksums Idénticos',
+        message: 'El checksum BASE y AUMENTO son iguales.\n\nEsto significa que el archivo .bin no cambió después de compilar.\n\nPor favor:\n1. Verifica que hayas modificado el código\n2. Ejecuta "make clean" o limpia el proyecto\n3. Vuelve a compilar\n4. Presiona "Finalizar" cuando el archivo .bin esté actualizado'
+      });
+      setWaitingForAumentoCompile(true);
       startFileMonitoring();
       return;
     }
-
-      if (formData.checksumBase === md5Aumento) {
-        console.log('⚠️ Checksums idénticos detectados');
-        console.log('BASE:', formData.checksumBase);
-        console.log('AUMENTO:', md5Aumento);
-        setShowProgressModal(false);
-        setIsCalculatingChecksums(false);
-        setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
-        setCompilationDetected(false);
-        showChecksumIdenticalError();
-        startFileMonitoring();
-        setWaitingForAumentoCompile(true);
-        return;
-      }
-      setChecksumWarning('');
+    setChecksumWarning('');
 
     console.log('✅ MD5 AUMENTO:', md5Aumento);
     setFormData(prev => ({ ...prev, checksumAumento: md5Aumento }));
@@ -1842,14 +1862,9 @@ ${formData.linksOneDrive || 'N/A'}
     const historialInfo = await registrarAumentoEnHistorial(formData.checksumBase, md5Aumento);
 
     setProgressStep('📁 Creando estructura de carpetas...');
-    const carpetaCreada = await crearEstructuraCarpetas(formData.checksumBase, md5Aumento);
+    await crearEstructuraCarpetas(formData.checksumBase, md5Aumento);
     
-    setProgressStep('📧 Generando correo en Outlook...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const asuntoCorreo = await crearCorreoOutlook(md5Aumento, carpetaCreada, historialInfo.zipPath || undefined);
-    if (asuntoCorreo) {
-      await new Promise(resolve => setTimeout(resolve, 1800));
-    }
+    const asuntoCorreo = await handleCreateEmail(md5Aumento, historialInfo.zipPath || undefined);
     
     setProgressStep('✅ Proceso completado');
     setIsCalculatingChecksums(false);
@@ -2219,17 +2234,14 @@ ${formData.linksOneDrive || 'N/A'}
                             label="📂 Ruta del Proyecto"
                             value={formData.rutaProyecto || formData.rutaCompilacion || ''}
                             onChange={handleRutaProyectoChange}
+                            onFilesSelected={handleWebFolderSelect}
                             error={errors.rutaCompilacion}
                             required
                             placeholder="Ej: C:\\builds\\proyecto\\v1.0.0"
-                            helper="Selecciona la carpeta raíz de tu proyecto para que la app busque scripts y binarios"
+                            helper="Selecciona la carpeta raíz de tu proyecto para que la app busque scripts y binarios (web y escritorio)"
                           />
 
-                          {!supportsProjectLookup && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 font-body">
-                              La detección automática solo está disponible en la app de escritorio.
-                            </p>
-                          )}
+                          {/* En modo web, la detección funciona tras seleccionar carpeta */}
 
                           <div className="mt-6">
                             <TextField
@@ -2242,7 +2254,37 @@ ${formData.linksOneDrive || 'N/A'}
                               helper="Nombre del archivo compilado"
                             />
                           </div>
-                          {/* Pista bajo el campo .bin deshabilitada */}
+                          
+                          {/* Campos manuales de checksum para modo web */}
+                          {!supportsProjectLookup && (
+                            <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700">
+                              <h4 className="text-sm font-bold text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-2">
+                                <span>⚠️</span>
+                                Modo Web: Checksums Manuales
+                              </h4>
+                              <p className="text-xs text-amber-700 dark:text-amber-400 mb-4">
+                                En modo web, debes calcular los checksums MD5 manualmente usando herramientas como CertUtil (Windows) o md5sum (Linux/Mac) e ingresarlos aquí.
+                              </p>
+                              <TextField
+                                label="Checksum BASE (MD5)"
+                                value={formData.checksumBase || ''}
+                                onChange={(val) => handleInputChange('checksumBase', val)}
+                                placeholder="Ej: a1b2c3d4e5f6..."
+                                helper="MD5 del archivo .bin de la versión BASE"
+                              />
+                              {includeAumentoCert && (
+                                <div className="mt-4">
+                                  <TextField
+                                    label="Checksum AUMENTO (MD5)"
+                                    value={formData.checksumAumento || ''}
+                                    onChange={(val) => handleInputChange('checksumAumento', val)}
+                                    placeholder="Ej: f6e5d4c3b2a1..."
+                                    helper="MD5 del archivo .bin de la versión AUMENTO"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -2292,20 +2334,9 @@ ${formData.linksOneDrive || 'N/A'}
                                       helper="Archivo donde actualizas la versión. Puede ser cualquier .h: buscamos dinámicamente #define VER/VERSION o coincidencias con tu cliente/versión."
                                     />
                                   </div>
-                                  {shouldShowHeaderHint && (
-                                    <p
-                                      className={cn(
-                                        'text-xs font-body mt-4 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300',
-                                        artifactHints.isSearching && 'text-gray-500'
-                                      )}
-                                    >
-                                      {artifactHints.isSearching
-                                        ? 'Buscando el archivo dentro del proyecto...'
-                                        : `Archivo detectado en ${artifactHints.headerPath}`}
-                                    </p>
-                                  )}
+
                                   
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 mt-6">
                                     <TextField
                                       label="Comando de Compilación"
                                       value={formData.comandoCompilacion || ''}
@@ -2573,14 +2604,16 @@ ${formData.linksOneDrive || 'N/A'}
                 </div>
 
                 {checksumWarning && (
-                  <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-r-xl">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-red-600 text-xl">⚠️</span>
-                      <p className="font-semibold text-red-800">Checksums Idénticos</p>
+                  <div className="mb-6 rounded-lg border border-red-300 bg-white p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-red-500 text-lg pt-0.5">⚠️</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-800 mb-1">El binario compilado no cambió</p>
+                        <p className="text-xs text-gray-600 leading-relaxed select-text">
+                          {checksumWarning}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-red-700 leading-relaxed">
-                      {checksumWarning}
-                    </p>
                   </div>
                 )}
 
@@ -2590,28 +2623,45 @@ ${formData.linksOneDrive || 'N/A'}
                 </div>
 
                 {formData.checksumBase && (
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 mb-4 border-2 border-green-200 shadow-sm">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                        <span className="text-white text-sm font-bold">✓</span>
-                      </div>
-                      <p className="text-xs font-semibold text-green-700 uppercase tracking-wider">Checksum BASE</p>
+                  <div className="bg-white rounded-xl p-5 mb-4 border border-gray-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-gray-500 text-base">✓</span>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Checksum BASE</p>
                     </div>
-                    <p className="text-green-800 font-mono text-sm break-all select-all bg-white/50 rounded-lg px-3 py-2">
+                    <p className="text-gray-800 font-mono text-sm break-all select-all bg-gray-50 rounded-lg px-3 py-2">
                       {formData.checksumBase}
                     </p>
                   </div>
                 )}
 
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-yellow-600 text-xl">⚠️</span>
-                    <p className="font-semibold text-yellow-800">Acción requerida:</p>
+                {checksumWarning ? (
+                  <div className="bg-red-50 border-2 border-red-400 p-5 mb-6 rounded-xl shadow-md">
+                    <div className="flex items-start gap-3 mb-3">
+                      <span className="text-red-600 text-2xl">❌</span>
+                      <div>
+                        <p className="font-bold text-red-900 text-lg mb-1">Error: Checksums idénticos</p>
+                        <p className="text-sm text-red-800 leading-relaxed font-medium">
+                          {checksumWarning}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-red-200">
+                      <p className="text-xs text-red-700">
+                        💡 <strong>Tip:</strong> Este mensaje desaparecerá automáticamente cuando detectemos una nueva compilación válida.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-yellow-800 leading-relaxed">
-                    Compila el proyecto ahora (en tu IDE, VM, o WSL). Cuando el archivo <span className="font-mono font-semibold">.bin</span> esté generado, presiona <strong>"Finalizar"</strong>.
-                  </p>
-                </div>
+                ) : (
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-yellow-600 text-xl">⚠️</span>
+                      <p className="font-semibold text-yellow-800">Acción requerida:</p>
+                    </div>
+                    <p className="text-sm text-yellow-800 leading-relaxed">
+                      Compila el proyecto ahora (en tu IDE, VM, o WSL). Cuando el archivo <span className="font-mono font-semibold">.bin</span> esté generado, presiona <strong>"Finalizar"</strong>.
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex gap-3">
                   <button
@@ -2708,22 +2758,7 @@ ${formData.linksOneDrive || 'N/A'}
                     </p>
                   )}
 
-                  {parsedErrorMessage.filePath && (
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide font-semibold text-gray-500 dark:text-gray-400">Archivo detectado</p>
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-800/40 border border-gray-200/70 dark:border-gray-700 p-3 font-mono text-xs text-gray-800 dark:text-gray-100 break-all">
-                          {parsedErrorMessage.filePath}
-                        </div>
-                        <button
-                          onClick={() => handleCopyErrorPath(parsedErrorMessage.filePath)}
-                          className="px-4 py-2 rounded-lg text-xs font-semibold bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 transition hover:opacity-90"
-                        >
-                          {copiedErrorPath ? 'Copiado' : 'Copiar'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+
 
                   {parsedErrorMessage.bulletItems.length > 0 && (
                     <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 dark:text-gray-200">

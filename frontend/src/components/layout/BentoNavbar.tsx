@@ -73,32 +73,7 @@ const BentoNavbar = ({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const location = useLocation();
 
-  // Las notificaciones se sincronizan automáticamente desde los toasts usando useToastWithHistory
-
-  const toggleNotifications = () => {
-    setIsNotificationsOpen(prev => {
-      const next = !prev;
-      if (next) {
-        setIsOpen(false);
-      }
-      return next;
-    });
-  };
-
-  const toggleModulesOverlay = () => {
-    setIsOpen(prev => {
-      const next = !prev;
-      if (next) {
-        setIsNotificationsOpen(false);
-      }
-      return next;
-    });
-  };
-
-  const handleModuleNavigation = () => {
-    setIsOpen(false);
-    setIsNotificationsOpen(false);
-  };
+  // Las notificaciones se sincronizan autom├íticamente desde los toasts usando useToastWithHistory
 
   return (
     <>
@@ -118,12 +93,11 @@ const BentoNavbar = ({
       >
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link to="/">
-              <motion.div
-                className="flex items-center gap-3 cursor-pointer group"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
+            <motion.div
+              className="flex items-center gap-3 cursor-pointer group"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
               <motion.div
                 className="relative w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg"
                 animate={{
@@ -149,7 +123,7 @@ const BentoNavbar = ({
                 />
               </motion.div>
               <div>
-                <h1 className="text-lg font-sans font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent">
+                <h1 className="text-lg font-display font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent">
                   Versiones App
                 </h1>
                 <p className="text-[10px] text-gray-600 dark:text-gray-400 font-body leading-tight">
@@ -157,7 +131,6 @@ const BentoNavbar = ({
                 </p>
               </div>
             </motion.div>
-            </Link>
 
             <div className="flex-1" />
 
@@ -165,7 +138,7 @@ const BentoNavbar = ({
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={toggleNotifications}
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                 className="hidden sm:flex relative p-2.5 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 hover:border-pink-400 dark:hover:border-pink-500 transition-all duration-300 hover:shadow-lg group"
               >
                 <BellIcon className="h-5 w-5 text-gray-600 dark:text-gray-300 group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors" />
@@ -236,7 +209,7 @@ const BentoNavbar = ({
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={toggleModulesOverlay}
+                onClick={() => setIsOpen(!isOpen)}
                 className="p-2.5 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 hover:border-pink-400 dark:hover:border-pink-500 transition-all duration-300 hover:shadow-lg"
               >
                 <AnimatePresence mode="wait">
@@ -269,197 +242,74 @@ const BentoNavbar = ({
       <AnimatePresence>
         {isOpen && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
             />
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-              className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-50 w-[94%] sm:w-[90%] max-w-4xl rounded-3xl bg-gradient-to-br from-gray-50/98 to-white/98 dark:from-gray-900/95 dark:to-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 shadow-2xl p-5 sm:p-8 overflow-hidden"
-            >
-              <div className="mb-6">
-                <h2 className="text-2xl font-sans font-extrabold bg-gradient-to-r from-pink-600 to-purple-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent">
+            <div className="fixed top-16 right-0 z-[101] w-screen max-w-none rounded-none sm:right-2 sm:w-[calc(100%-1rem)] sm:rounded-2xl md:right-3 md:w-[calc(100%-1.5rem)] lg:right-4 lg:w-[calc(100%-2rem)] lg:rounded-2xl lg:max-w-6xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-2xl p-6 max-h-[calc(100vh-88px)] overflow-y-auto">
+              <button
+                onClick={() => setIsOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <XMarkIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+              </button>
+
+              <div className="mb-6 pr-12">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Módulos del Sistema
                 </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 font-sans mt-1">
-                  Navega por los módulos principales
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Selecciona el módulo que deseas utilizar
                 </p>
               </div>
 
-              <div className="max-h-[60vh] overflow-y-auto overflow-x-hidden pr-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                {modules.map((module, index) => {
-                  const isActive = location.pathname === module.href;
-                  const Icon = module.icon;
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {modules.map((module) => {
+                    const isActive = location.pathname === module.href;
+                    const Icon = module.icon;
 
-                  return (
-                    <div key={module.id}>
-                      <Link
-                        to={module.href}
-                        onClick={handleModuleNavigation}
-                        className="block"
-                      >
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05, duration: 0.2 }}
-                          whileHover={{ scale: 1.015 }}
-                          whileTap={{ scale: 0.98 }}
+                    return (
+                      <div key={module.id}>
+                        <Link
+                          to={module.href}
+                          onClick={() => setIsOpen(false)}
                           className={cn(
-                            'relative p-6 rounded-2xl border-2 transition-all duration-200 group cursor-pointer',
+                            'block p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer relative group',
                             'bg-white dark:bg-gray-800',
-                            'h-[200px] flex flex-col items-center justify-center gap-3',
+                            'hover:shadow-lg hover:scale-[1.02]',
                             isActive
-                              ? 'border-pink-500 dark:border-pink-400 shadow-2xl shadow-pink-500/30 bg-gradient-to-br from-pink-100/80 to-purple-100/80 dark:from-pink-900/30 dark:to-purple-900/30 ring-2 ring-pink-500/20'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-pink-400 dark:hover:border-pink-500 hover:shadow-2xl hover:shadow-pink-500/20 hover:bg-gradient-to-br hover:from-pink-50/50 hover:to-purple-50/50 dark:hover:from-pink-900/10 dark:hover:to-purple-900/10'
+                              ? 'border-pink-500 dark:border-pink-400 shadow-lg shadow-pink-500/20 bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-900/20 dark:to-purple-900/20'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-pink-400 dark:hover:border-pink-500'
                           )}
                         >
-                          {/* Gradiente animado en hover */}
-                          <motion.div
-                            className={cn(
-                              'absolute inset-0 bg-gradient-to-br rounded-2xl',
-                              module.color
-                            )}
-                            initial={{ opacity: 0 }}
-                            whileHover={{ opacity: 0.15 }}
-                            transition={{
-                              duration: 0.15,
-                              ease: 'easeOut'
-                            }}
-                            animate={{
-                              backgroundPosition: ['0% 0%', '100% 100%', '0% 0%']
-                            }}
-                            style={{
-                              backgroundSize: '200% 200%'
-                            }}
-                          />
-
-                          {/* Partículas flotantes en hover */}
-                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                            {[...Array(8)].map((_, i) => (
-                              <motion.div
-                                key={i}
-                                className="absolute w-1 h-1 rounded-full bg-gradient-to-r from-pink-400 to-purple-400"
-                                style={{
-                                  left: `${15 + (i % 4) * 25}%`,
-                                  top: `${20 + Math.floor(i / 4) * 60}%`
-                                }}
-                                animate={{
-                                  y: [-15, 15, -15],
-                                  x: [Math.sin(i) * 10, -Math.sin(i) * 10, Math.sin(i) * 10],
-                                  opacity: [0, 1, 0],
-                                  scale: [0.5, 1.2, 0.5]
-                                }}
-                                transition={{
-                                  duration: 2 + i * 0.3,
-                                  repeat: Infinity,
-                                  delay: i * 0.2
-                                }}
-                              />
-                            ))}
-                          </div>
-
-                          {/* Brillo diagonal en hover */}
-                          <motion.div
-                            className="absolute inset-0 bg-gradient-to-br from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100"
-                            animate={{
-                              x: ['-100%', '100%'],
-                              y: ['-100%', '100%']
-                            }}
-                            transition={{
-                              duration: 2,
-                              repeat: Infinity,
-                              ease: 'linear'
-                            }}
-                            style={{
-                              transform: 'rotate(-45deg)',
-                              width: '150%',
-                              height: '150%'
-                            }}
-                          />
-
-                          {/* Línea de escaneo */}
-                          <motion.div
-                            className="absolute w-full h-[2px] bg-gradient-to-r from-transparent via-pink-400 to-transparent opacity-0 group-hover:opacity-50"
-                            animate={{
-                              y: ['0%', '100%']
-                            }}
-                            transition={{
-                              duration: 2,
-                              repeat: Infinity,
-                              ease: 'linear'
-                            }}
-                          />
-
-                          {isActive && (
-                            <>
-                              <div className="absolute inset-0 bg-gradient-to-br from-pink-400/20 via-purple-400/20 to-indigo-400/20 rounded-2xl animate-pulse" />
-                              <div
-                                className="absolute inset-0 rounded-2xl"
-                                style={{
-                                  background: 'radial-gradient(circle at 50% 50%, rgba(236, 72, 153, 0.15), transparent 70%)'
-                                }}
-                              />
-                            </>
+                          {module.badge && (
+                            <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold shadow-md">
+                              {module.badge}
+                            </span>
                           )}
-
-                          <div className="relative z-10 flex flex-col items-center justify-center gap-2.5 w-full h-full">
-                            {/* Badge */}
-                            {module.badge && (
-                              <motion.span
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="absolute top-0 right-0 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white text-[10px] font-bold shadow-lg"
-                              >
-                                {module.badge}
-                              </motion.span>
-                            )}
-
-                            {/* Ãcono */}
-                            <motion.div
-                              whileHover={{ 
-                                scale: 1.1,
-                                rotate: 5
-                              }}
-                              transition={{ 
-                                type: 'spring',
-                                stiffness: 400,
-                                damping: 20
-                              }}
-                              className={cn(
-                                'relative w-16 h-16 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg shrink-0',
-                                module.color
-                              )}
-                            >
-                              <Icon className="w-8 h-8 text-white relative z-10" />
-                              {/* Sombra del Ã­cono */}
-                              <div className="absolute -inset-0.5 bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-xl blur-sm -z-10" />
-                            </motion.div>
+                          
+                          <div className="flex flex-col items-center justify-center gap-3 text-center">
+                            <div className={cn(
+                              'w-16 h-16 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform',
+                              module.color
+                            )}>
+                              <Icon className="w-8 h-8 text-white" />
+                            </div>
                             
-                            {/* Título */}
-                            <h3 className="text-base font-sans font-bold text-center text-gray-900 dark:text-white leading-tight px-2">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white">
                               {module.title}
                             </h3>
                             
-                            {/* Descripción */}
-                            <p className="text-xs text-gray-600 dark:text-gray-400 font-body text-center leading-snug px-2 line-clamp-2">
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
                               {module.description}
                             </p>
                           </div>
-                        </motion.div>
-                      </Link>
-                    </div>
-                  );
-                })}
-                </div>
+                        </Link>
+                      </div>
+                    );
+                  })}
               </div>
-            </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>
@@ -477,4 +327,3 @@ const BentoNavbar = ({
 };
 
 export default BentoNavbar;
-

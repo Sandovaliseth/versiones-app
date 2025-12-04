@@ -13,49 +13,50 @@ export const crearCorreoHtml = (
   md5Aumento?: string,
   _carpetaOneDrive?: string | null,
   md5Base?: string
-) => {
-  // Formato: SOLICITUD DE FIRMA ENLACEAV2.0.0_251201 NEW6260 | ATC
-  const versionCompleta = `${formData.nombreVersionCliente || ''}${formData.versionBase || ''}.${(formData.versionAumento || formData.versionBase || '').split('.').pop() || '0'}`;
-  const subject = `SOLICITUD DE FIRMA ${versionCompleta}_${formData.build || ''} ${formData.terminal || ''} | ${formData.cliente || ''}`.replace(/\s+/g, ' ').trim();
+)=> {
+  // Asunto usando exactamente los valores ingresados por el usuario
+  const baseStr = `${formData.nombreVersionCliente || ''}${formData.versionBase || ''}`.trim();
+  const aumentoStr = `${formData.nombreVersionCliente || ''}${formData.versionAumento || ''}`.trim();
+  const versionStr = formData.checksumAumento ? aumentoStr : baseStr;
+  const subject = `SOLICITUD DE FIRMA ${versionStr}_${formData.build || ''} ${formData.terminal || ''} | ${formData.cliente || ''}`.replace(/\s+/g, ' ').trim();
 
   // Checksums correctos
   const baseChecksum = md5Base || formData.checksumBase || '';
   const aumentoChecksum = md5Aumento || formData.checksumAumento || '';
 
-  // Body HTML con formato de la imagen 4
-  const lines: string[] = [];
-  lines.push('<div style="font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #000;">');
-  lines.push('<p style="margin: 0 0 10px 0;">Cordial saludo,</p>');
-  lines.push(`<p style="margin: 0 0 10px 0;">Espero que te encuentres muy bien. Mediante el presente, realizo la entrega formal de la versión <strong>${formData.nombreVersionCliente || ''}${formData.versionBase || ''}.0_${formData.build || ''}</strong> para su respectiva firma.</p>`);
-  lines.push('<p style="margin: 0;"></p>');
-  lines.push('<p style="margin: 0 0 5px 0;"><strong>Detalles:</strong></p>');
-  lines.push('<ul style="margin: 0 0 10px 0; padding-left: 20px;">');
+
+
+  // Body HTML simple como en la imagen - sin estilos complejos
+  let body = '<div style="font-family:Calibri;font-size:12pt;">';
+  body += '<p>Cordial saludo,</p>';
+  body += '<p>Espero que te encuentres muy bien. Mediante el presente, realizo la entrega formal de la versión <b>' + versionStr + '_' + (formData.build || '') + '</b> para su respectiva firma.</p>';
+  body += '<p><b>Detalles:</b></p>';
+  body += '<ul>';
   
   // VERSIÓN BASE
-  lines.push(`<li style="margin: 0 0 5px 0;"><strong>VERSIÓN - ${formData.nombreVersionCliente || ''}${formData.versionBase || ''}</strong></li>`);
-  lines.push('<ul style="margin: 0 0 10px 0; padding-left: 20px; list-style-type: circle;">');
-  lines.push(`<li><strong>Terminal:</strong> ${formData.terminal || ''}</li>`);
-  lines.push(`<li><strong>Tipo de firma:</strong> ${formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Genérica'}</li>`);
-  lines.push(`<li><strong>CID:</strong> ${formData.cid || '0'}</li>`);
-  lines.push(`<li><strong>Nombre del archivo:</strong> ${formData.nombreArchivoBin || ''}</li>`);
-  lines.push(`<li><strong>Checksum (MD5):</strong> ${baseChecksum}</li>`);
-  lines.push('</ul>');
+  body += '<li><b>VERSIÓN- ' + baseStr + '</b>';
+  body += '<ul style="list-style-type:circle;">';
+  body += '<li><b>Terminal:</b> ' + (formData.terminal || '') + '</li>';
+  body += '<li><b>Tipo de firma:</b> ' + (formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Genérica') + '</li>';
+  body += '<li><b>CID:</b> ' + (formData.cid || '0') + '</li>';
+  body += '<li><b>Nombre del archivo:</b> ' + (formData.nombreArchivoBin || '') + '</li>';
+  body += '<li><b>Checksum (MD5):</b> ' + baseChecksum + '</li>';
+  body += '</ul></li>';
   
   // VERSIÓN DE AUMENTO (si existe)
   if (aumentoChecksum) {
-    lines.push(`<li style="margin: 0 0 5px 0;"><strong>VERSIÓN DE AUMENTO - ${formData.nombreVersionCliente || ''}${formData.versionAumento || ''}</strong></li>`);
-    lines.push('<ul style="margin: 0 0 10px 0; padding-left: 20px; list-style-type: circle;">');
-    lines.push(`<li><strong>Terminal:</strong> ${formData.terminal || ''}</li>`);
-    lines.push(`<li><strong>Tipo de firma:</strong> ${formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Genérica'}</li>`);
-    lines.push(`<li><strong>CID:</strong> ${formData.cid || '0'}</li>`);
-    lines.push(`<li><strong>Nombre del archivo:</strong> ${formData.nombreArchivoBin || ''}</li>`);
-    lines.push(`<li><strong>Checksum (MD5):</strong> ${aumentoChecksum}</li>`);
-    lines.push('</ul>');
+    body += '<li><b>VERSIÓN DE AUMENTO- ' + aumentoStr + '</b>';
+    body += '<ul style="list-style-type:circle;">';
+    body += '<li><b>Terminal:</b> ' + (formData.terminal || '') + '</li>';
+    body += '<li><b>Tipo de firma:</b> ' + (formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Genérica') + '</li>';
+    body += '<li><b>CID:</b> ' + (formData.cid || '0') + '</li>';
+    body += '<li><b>Nombre del archivo:</b> ' + (formData.nombreArchivoBin || '') + '</li>';
+    body += '<li><b>Checksum (MD5):</b> ' + aumentoChecksum + '</li>';
+    body += '</ul></li>';
   }
   
-  lines.push('</ul>');
-  lines.push('</div>');
+  body += '</ul>';
+  body += '</div>';
 
-  const body = lines.join('');
   return { subject, body };
 };

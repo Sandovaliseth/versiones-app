@@ -104,6 +104,7 @@ function createWindow() {
     show: false, // No mostrar hasta que esté lista
     frame: true, // Mantener frame nativo del SO
     titleBarStyle: 'default',
+    autoHideMenuBar: false // Asegurar que el menú del sistema sea visible
   });
 
   // En desarrollo: cargar desde servidor Vite
@@ -121,6 +122,8 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.focus();
+    // En algunas instalaciones de Windows, el menú puede ocultarse; forzar visibilidad
+    try { mainWindow.setMenuBarVisibility(true); } catch (e) { /* ignore */ }
   });
 
   // Timeout de seguridad: si no se muestra en 3s, forzar mostrar
@@ -254,6 +257,16 @@ ipcMain.handle('compute-md5', async (_event, filePath) => {
     stream.on('error', () => resolve(''));
     stream.on('end', () => resolve(hash.digest('hex')));
   });
+});
+
+ipcMain.handle('get-file-stat', async (_event, targetPath) => {
+  if (!targetPath) return { ok: false };
+  try {
+    const s = fs.statSync(targetPath);
+    return { ok: true, mtimeMs: s.mtimeMs, size: s.size };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
 });
 
 ipcMain.handle('capture-screenshot', async (_event, options = {}) => {
@@ -735,6 +748,86 @@ ipcMain.handle('zip-artifacts', async (_event, payload = {}) => {
     zip.writeZip(zipPath);
 
     return { ok: true, path: zipPath, files: existingFiles };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+});
+
+// File watchers: allow renderer to request a watcher and receive events
+const fileWatchers = new Map();
+let fileWatchIdCounter = 1;
+
+ipcMain.handle('start-file-watch', async (event, targetPath) => {
+  if (!targetPath) return { ok: false, error: 'Ruta no especificada' };
+  try {
+    const id = `fw_${Date.now()}_${fileWatchIdCounter++}`;
+    // Decide whether to watch the parent directory (safer) or the path directly
+    let watchTarget = targetPath;
+    let watchedIsDir = false;
+    try {
+      const st = fs.statSync(targetPath);
+      if (st.isFile()) {
+        watchTarget = path.dirname(targetPath);
+        watchedIsDir = true;
+      }
+    } catch (e) {
+      // If stat fails, fall back to watching the parent directory
+      try {
+        watchTarget = path.dirname(targetPath);
+        watchedIsDir = true;
+      } catch (err) {
+        // fallback to targetPath as-is
+        watchTarget = targetPath;
+      }
+    }
+
+    // Crear watcher sobre la carpeta/archivo según corresponda
+    let watcher;
+    try {
+      watcher = fs.watch(watchTarget, { persistent: false }, (evtType, filename) => {
+        try {
+          // Resolve full path when possible
+          const eventPath = filename ? path.join(watchTarget, filename) : watchTarget;
+          // If we watched the directory, filter events to the requested file
+          if (watchedIsDir) {
+            const targetBase = path.basename(targetPath);
+            if (!filename || filename !== targetBase) return;
+          }
+          event.sender.send('file-watch-event', { watchId: id, path: eventPath, event: evtType || 'change', timestamp: Date.now() });
+        } catch (e) {
+          // ignore send errors
+        }
+      });
+    } catch (watchErr) {
+      // If creating watcher fails (permissions, EPERM), return error without throwing
+      return { ok: false, error: String(watchErr) };
+    }
+
+    // Attach error handler so watcher internal errors don't crash main process
+    watcher.on('error', (err) => {
+      try {
+        event.sender.send('file-watch-error', { watchId: id, path: watchTarget, error: String(err) });
+      } catch (e) { /* ignore */ }
+      try { watcher.close(); } catch (e) { /* ignore */ }
+      fileWatchers.delete(id);
+    });
+
+    fileWatchers.set(id, watcher);
+    return { ok: true, watchId: id };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('stop-file-watch', async (_event, watchId) => {
+  try {
+    if (!watchId) return { ok: false, error: 'watchId requerido' };
+    const w = fileWatchers.get(watchId);
+    if (w) {
+      try { w.close(); } catch (e) { /* ignore */ }
+      fileWatchers.delete(watchId);
+    }
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };
   }

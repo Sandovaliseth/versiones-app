@@ -29,6 +29,8 @@ export interface Version {
   releaseNotesPath?: string;
   creadoEn: string;
   actualizadoEn?: string;
+  // Asunto del correo (draft) asociado a esta versión para seguimiento/monitoreo
+  outlookSubject?: string;
 }
 
 // Artefacto relacionado a una versión

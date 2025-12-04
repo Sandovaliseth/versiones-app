@@ -22,7 +22,11 @@ declare global {
       createOutlookDraft(opts: ElectronCreateDraftOptions): Promise<any>;
       checkOutlookReplies(opts: { subjectContains?: string; sinceMinutes?: number; subjectKeyword?: string }): Promise<any>;
       computeMd5(path: string): Promise<string>;
+      getFileStat(path: string): Promise<{ ok: boolean; mtimeMs?: number; size?: number; error?: string }>;
       runCompilation(...args: any[]): Promise<any>;
+      startFileWatch(filePath: string): Promise<{ ok: boolean; watchId?: string; error?: string }>;
+      stopFileWatch(watchId: string): Promise<{ ok: boolean; error?: string }>;
+      onFileWatchEvent: (cb: (data: { watchId: string; path: string; event: string; timestamp: number }) => void) => () => void;
       findVersionFile(
         rootPath: string,
         options?: {

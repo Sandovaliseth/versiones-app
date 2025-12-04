@@ -54,7 +54,7 @@ const MainLayoutContent = ({ children }: MainLayoutProps) => {
 
   return (
     <ToastContext.Provider value={toast}>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+      <div className="h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
         <BentoNavbar 
           darkMode={darkMode} 
           toggleDarkMode={toggleDarkMode}
@@ -65,8 +65,8 @@ const MainLayoutContent = ({ children }: MainLayoutProps) => {
         />
         
         <ToastManager toasts={toast.toasts} removeToast={toast.removeToast} />
-        
-        <main className="py-8 px-4 sm:px-6 lg:px-8">
+        {/* Main content con scroll controlado */}
+        <main className="h-[calc(100vh-64px)] overflow-y-auto py-6 px-4 sm:px-6 lg:px-8">
           {children}
         </main>
       </div>

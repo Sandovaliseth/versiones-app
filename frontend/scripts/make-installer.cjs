@@ -1,7 +1,8 @@
 const path = require('path');
 const installer = require('electron-winstaller');
 
-const appDirectory = path.resolve(__dirname, '..', 'dist-electron', 'Gestor de Versiones-win32-x64');
+// electron-packager produced `dist-electron\win-unpacked` with the app files
+const appDirectory = path.resolve(__dirname, '..', 'dist-electron', 'win-unpacked');
 const outputDirectory = path.resolve(__dirname, '..', 'dist-installer');
 const exeName = 'Gestor de Versiones.exe';
 

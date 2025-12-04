@@ -316,6 +316,7 @@ interface PathFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onFilesSelected?: (files: FileList | null) => void;
   error?: string;
   required?: boolean;
   placeholder?: string;
@@ -326,6 +327,7 @@ export const PathField: React.FC<PathFieldProps> = ({
   label,
   value,
   onChange,
+  onFilesSelected,
   error,
   required,
   placeholder,
@@ -340,6 +342,9 @@ export const PathField: React.FC<PathFieldProps> = ({
 
   const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
+    if (onFilesSelected) {
+      onFilesSelected(files);
+    }
     if (files && files.length > 0) {
       // Obtener la ruta de la primera archivo (la carpeta)
       const file = files[0];

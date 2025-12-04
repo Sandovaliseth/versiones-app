@@ -49,6 +49,44 @@ const Versions = () => {
     };
   }, []);
 
+  // Escuchar eventos emitidos por el flujo de creación/monitorización (ej. respuestas aprobadas)
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payload = (ev as CustomEvent).detail as any;
+        if (!payload?.subject) return;
+        const inbox = storageService.getVersiones() || [];
+        const matched = inbox.find(v => v.outlookSubject && v.outlookSubject === payload.subject);
+        if (matched) {
+          // Abrir visibilidad de la versión y marcar como 'Ready' para el siguiente paso
+          setSelectedVersion(matched);
+          // Abrimos la ficha y el editor para continuar con la certificación
+          setShowVerModal(true);
+          setShowEditarModal(true);
+          storageService.updateVersion(matched.id, { estado: 'Ready' });
+          // Avanzar automáticamente hacia certificación / entrega (último paso)
+          // Marcamos como Published para reflejar la entrega final del binario firmado.
+          setTimeout(() => {
+            storageService.updateVersion(matched.id, { estado: 'Published' });
+            loadVersions();
+            toastGlobal.success('Certificación automática', `${matched.numeroVersion} ha sido certificado y entregado automáticamente.`);
+          }, 900);
+          loadVersions();
+          toastGlobal.success('Respuesta aprobada', `Se detectó respuesta para ${matched.numeroVersion} — abriendo certificación`);
+        } else {
+          // No hay mapeo directo en localStorage — avisar al usuario
+          toastGlobal.info('Respuesta detectada', `Se detectó un correo aprobado con asunto: ${payload.subject}`);
+        }
+      } catch (e) {
+        console.warn('Error processing version:approved event', e);
+      }
+    };
+
+    window.addEventListener('version:approved', handler as any);
+    return () => window.removeEventListener('version:approved', handler as any);
+  }, [toastGlobal]);
+
   const loadVersions = async () => {
     try {
       setLoading(true);
@@ -194,6 +232,7 @@ const Versions = () => {
         nombre: nombreVersion,
         numeroVersion: numeroVersion,
         buildYyyymmdd: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
+        outlookSubject: (versionData as any).outlookSubject || undefined,
         estado: 'Draft' as VersionEstado,
         responsable: versionData.responsable || 'Usuario'
       });

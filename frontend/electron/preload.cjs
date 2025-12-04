@@ -21,11 +21,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   findFiles: (rootPath, patterns) => ipcRenderer.invoke('find-files', rootPath, patterns),
   findVersionFile: (rootPath, options) => ipcRenderer.invoke('find-version-file', rootPath, options),
   computeMd5: (filePath) => ipcRenderer.invoke('compute-md5', filePath),
+  getFileStat: (filePath) => ipcRenderer.invoke('get-file-stat', filePath),
   captureScreenshot: (options) => ipcRenderer.invoke('capture-screenshot', options),
   runCompilation: (command, cwd, stdinData) => ipcRenderer.invoke('run-compilation', command, cwd, stdinData),
   zipArtifacts: (options) => ipcRenderer.invoke('zip-artifacts', options),
   createOutlookDraft: (options) => ipcRenderer.invoke('create-outlook-draft', options),
   checkOutlookReplies: (options) => ipcRenderer.invoke('check-outlook-replies', options),
+  // File watch API: start/stop native watchers and subscribe to events
+  startFileWatch: (filePath) => ipcRenderer.invoke('start-file-watch', filePath),
+  stopFileWatch: (watchId) => ipcRenderer.invoke('stop-file-watch', watchId),
+  onFileWatchEvent: (cb) => {
+    const handler = (_event, data) => {
+      try { cb && cb(data); } catch (e) { /* ignore */ }
+    };
+    ipcRenderer.on('file-watch-event', handler);
+    return () => ipcRenderer.removeListener('file-watch-event', handler);
+  },
   
   // Puedes agregar más funcionalidades aquí según necesites
   // Por ejemplo: acceso a sistema de archivos, notificaciones del SO, etc.

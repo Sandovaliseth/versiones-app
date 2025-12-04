@@ -48,6 +48,8 @@ export interface CrearVersionData {
   responsable?: string;
   departamento?: string;
   notasTecnicas?: string;
+  // --- Mapping to drafted email subject (optional) - used so the app can map replies to versions
+  outlookSubject?: string;
 }
 
 export const camposRequeridos = {
@@ -111,6 +113,7 @@ export const initialFormData: CrearVersionData = {
   checksumPkgBase: '',
   nombrePkgAumento: '',
   checksumPkgAumento: '',
+  outlookSubject: '',
   responsable: '',
   departamento: '',
   notasTecnicas: ''

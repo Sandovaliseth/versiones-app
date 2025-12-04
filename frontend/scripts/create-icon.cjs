@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const size = 64;
+// Generar icono grande (256x256) para packs firmados
+const size = 256;
 
 const bgStart = { r: 15, g: 23, b: 42 };
 const bgEnd = { r: 30, g: 58, b: 138 };
@@ -17,10 +18,10 @@ function colorForPixel(x, y) {
   let b = lerp(bgStart.b, bgEnd.b, gradientT);
   const a = 255;
 
-  const normalizedY = Math.min(1, Math.max(0, (y - 8) / (size - 16)));
-  const leftX = 14 + normalizedY * 18;
-  const rightX = 50 - normalizedY * 18;
-  const thickness = 2.5 + (1 - normalizedY) * 1.5;
+  const normalizedY = Math.min(1, Math.max(0, (y - Math.round(size * 0.03)) / (size - Math.round(size * 0.06))));
+  const leftX = Math.round(size * 0.055) + normalizedY * Math.round(size * 0.07);
+  const rightX = Math.round(size * 0.195) - normalizedY * Math.round(size * 0.07);
+  const thickness = Math.max(1, 2.5 + (1 - normalizedY) * 1.5);
   const accentT = normalizedY;
   const accentR = lerp(accentStart.r, accentEnd.r, accentT);
   const accentG = lerp(accentStart.g, accentEnd.g, accentT);
@@ -38,8 +39,9 @@ function colorForPixel(x, y) {
   }
 
   const circleDx = x - size / 2;
-  const circleDy = y - (size / 2 + 2);
-  if (circleDx * circleDx + circleDy * circleDy <= 25) {
+  const circleDy = y - (size / 2 + Math.round(size * 0.008));
+  const circleRadius = Math.round(size * 0.09);
+  if (circleDx * circleDx + circleDy * circleDy <= circleRadius * circleRadius) {
     r = 252;
     g = 211;
     b = 77;
@@ -55,8 +57,9 @@ function createIco(outputPath) {
   header.writeUInt16LE(1, 4);
 
   const dir = Buffer.alloc(16);
-  dir.writeUInt8(size, 0);
-  dir.writeUInt8(size, 1);
+  // ICO format: width/height are stored as a single byte (0 = 256)
+  dir.writeUInt8(size === 256 ? 0 : size, 0);
+  dir.writeUInt8(size === 256 ? 0 : size, 1);
   dir.writeUInt8(0, 2);
   dir.writeUInt8(0, 3);
   dir.writeUInt16LE(1, 4);
