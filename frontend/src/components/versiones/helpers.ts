@@ -13,50 +13,41 @@ export const crearCorreoHtml = (
   md5Aumento?: string,
   _carpetaOneDrive?: string | null,
   md5Base?: string
-)=> {
-  // Asunto usando exactamente los valores ingresados por el usuario
+) => {
   const baseStr = `${formData.nombreVersionCliente || ''}${formData.versionBase || ''}`.trim();
   const aumentoStr = `${formData.nombreVersionCliente || ''}${formData.versionAumento || ''}`.trim();
   const versionStr = formData.checksumAumento ? aumentoStr : baseStr;
   const subject = `SOLICITUD DE FIRMA ${versionStr}_${formData.build || ''} ${formData.terminal || ''} | ${formData.cliente || ''}`.replace(/\s+/g, ' ').trim();
 
-  // Checksums correctos
   const baseChecksum = md5Base || formData.checksumBase || '';
   const aumentoChecksum = md5Aumento || formData.checksumAumento || '';
 
-
-
-  // Body HTML simple como en la imagen - sin estilos complejos
-  let body = '<div style="font-family:Calibri;font-size:12pt;">';
-  body += '<p>Cordial saludo,</p>';
-  body += '<p>Espero que te encuentres muy bien. Mediante el presente, realizo la entrega formal de la versión <b>' + versionStr + '_' + (formData.build || '') + '</b> para su respectiva firma.</p>';
-  body += '<p><b>Detalles:</b></p>';
-  body += '<ul>';
+  let body = '<div style="font-family:Calibri;font-size:12pt;line-height:1.6;">';
+  body += '<p style="margin:0;">Cordial saludo,<br>Espero que te encuentres muy bien. Mediante el presente, realizo la entrega formal de la versión <b>' + versionStr + '_' + (formData.build || '') + '</b> para su respectiva firma.</p>';
+  body += '<p style="margin:12px 0 8px 0;"><b>Detalles:</b></p>';
+  body += '<ul style="margin:0;padding-left:20px;">';
   
-  // VERSIÓN BASE
-  body += '<li><b>VERSIÓN- ' + baseStr + '</b>';
-  body += '<ul style="list-style-type:circle;">';
-  body += '<li><b>Terminal:</b> ' + (formData.terminal || '') + '</li>';
-  body += '<li><b>Tipo de firma:</b> ' + (formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Genérica') + '</li>';
-  body += '<li><b>CID:</b> ' + (formData.cid || '0') + '</li>';
-  body += '<li><b>Nombre del archivo:</b> ' + (formData.nombreArchivoBin || '') + '</li>';
-  body += '<li><b>Checksum (MD5):</b> ' + baseChecksum + '</li>';
+  body += '<li style="margin:4px 0;"><b>VERSI&Oacute;N- ' + baseStr + '</b>';
+  body += '<ul style="margin:0;padding-left:20px;list-style-type:circle;">';
+  body += '<li style="margin:2px 0;"><b>Terminal:</b> ' + (formData.terminal || '') + '</li>';
+  body += '<li style="margin:2px 0;"><b>Tipo de firma:</b> ' + (formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Gen&eacute;rica') + '</li>';
+  body += '<li style="margin:2px 0;"><b>CID:</b> ' + (formData.cid || '0') + '</li>';
+  body += '<li style="margin:2px 0;"><b>Nombre del archivo:</b> ' + (formData.nombreArchivoBin || '') + '</li>';
+  body += '<li style="margin:2px 0;"><b>Checksum (MD5):</b> ' + baseChecksum + '</li>';
   body += '</ul></li>';
   
-  // VERSIÓN DE AUMENTO (si existe)
   if (aumentoChecksum) {
-    body += '<li><b>VERSIÓN DE AUMENTO- ' + aumentoStr + '</b>';
-    body += '<ul style="list-style-type:circle;">';
-    body += '<li><b>Terminal:</b> ' + (formData.terminal || '') + '</li>';
-    body += '<li><b>Tipo de firma:</b> ' + (formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Genérica') + '</li>';
-    body += '<li><b>CID:</b> ' + (formData.cid || '0') + '</li>';
-    body += '<li><b>Nombre del archivo:</b> ' + (formData.nombreArchivoBin || '') + '</li>';
-    body += '<li><b>Checksum (MD5):</b> ' + aumentoChecksum + '</li>';
+    body += '<li style="margin:4px 0;"><b>VERSI&Oacute;N DE AUMENTO- ' + aumentoStr + '</b>';
+    body += '<ul style="margin:0;padding-left:20px;list-style-type:circle;">';
+    body += '<li style="margin:2px 0;"><b>Terminal:</b> ' + (formData.terminal || '') + '</li>';
+    body += '<li style="margin:2px 0;"><b>Tipo de firma:</b> ' + (formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Gen&eacute;rica') + '</li>';
+    body += '<li style="margin:2px 0;"><b>CID:</b> ' + (formData.cid || '0') + '</li>';
+    body += '<li style="margin:2px 0;"><b>Nombre del archivo:</b> ' + (formData.nombreArchivoBin || '') + '</li>';
+    body += '<li style="margin:2px 0;"><b>Checksum (MD5):</b> ' + aumentoChecksum + '</li>';
     body += '</ul></li>';
   }
   
-  body += '</ul>';
-  body += '</div>';
+  body += '</ul></div>';
 
   return { subject, body };
 };

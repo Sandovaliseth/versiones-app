@@ -906,32 +906,37 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
 
       const { subject, body } = crearCorreoHtml(formData as any, md5Aumento || undefined, carpetaOneDrive || null, formData.checksumBase);
 
-      // Solo adjuntar el ZIP del historial
       const attachments: string[] = [];
-      if (historialZipPath && await window.electronAPI.fileExists(historialZipPath)) {
-        attachments.push(historialZipPath);
-        console.log(`✅ Adjuntando ZIP del historial: ${historialZipPath}`);
+      if (historialZipPath) {
+        const exists = await window.electronAPI.fileExists(historialZipPath);
+        if (exists) {
+          attachments.push(historialZipPath);
+          console.log(`✅ Adjuntando ZIP: ${historialZipPath}`);
+        } else {
+          console.warn(`⚠️ Archivo ZIP no existe: ${historialZipPath}`);
+        }
       } else {
-        console.warn('⚠️ No se encontró el ZIP del historial para adjuntar');
+        console.warn('⚠️ historialZipPath está vacío/undefined');
       }
 
+      console.log(`📧 Enviando correo con ${attachments.length} adjunto(s)`);
       const resultado = await window.electronAPI.createOutlookDraft({
         subject,
         body,
         to: '',
         send: false,
         saveToSent: false,
-        attachments
+        attachments: attachments.length > 0 ? attachments : undefined
       });
 
       if (resultado.ok) {
-        console.log(`✅ Correo creado en Outlook como borrador con ${attachments.length} adjunto(s)`);
+        console.log(`✅ Correo creado exitosamente con ${attachments.length} adjunto(s)`);
         return subject;
       }
       console.error('❌ Error creando correo:', resultado.error);
       return '';
     } catch (error) {
-      console.error('❌ Error creando correo:', error);
+      console.error('❌ Error en crearCorreoOutlook:', error);
       return '';
     }
   };
@@ -1606,7 +1611,7 @@ ${formData.linksOneDrive || 'N/A'}
         if (versionFilePath && formData.versionBase) {
           const currentContent = await window.electronAPI.readTextFile(versionFilePath);
           if (currentContent?.ok && currentContent.content) {
-            const basePattern = new RegExp(`\"${formData.versionBase.replace(/\./g, '\\.')}\"|${formData.versionBase.replace(/\./g, '_')}`, 'i');
+            const basePattern = new RegExp(`"${formData.versionBase.replace(/\./g, '\\.')}"`, 'i');
             if (!basePattern.test(currentContent.content)) {
               await updateVersionInFile(versionFilePath, formData.versionBase);
             }
