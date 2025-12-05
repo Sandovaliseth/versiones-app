@@ -214,8 +214,6 @@ const selectBestBinCandidate = (matches: string[] = [], context: BinSelectionCon
   return best;
 };
 
-const CHECKSUM_RECOMPILE_MESSAGE = 'Los checksums BASE y AUMENTO son idénticos. Ejecuta "make clean" (o limpia completamente tu proyecto) y vuelve a compilar para generar un binario diferente.';
-
 const normalizeWindowsSlashes = (value: string) => value.replace(/\//g, '\\');
 const isAbsoluteWindowsPath = (value: string) => /^(?:[a-zA-Z]:\\|\\\\)/.test(value);
 
@@ -253,20 +251,11 @@ const sanitizePathSegment = (value?: string, preserveDots: boolean = false) => {
 };
 
 const buildHistorialFolderName = (data: CrearVersionData) => {
-  const cliente = sanitizePathSegment(data.nombreVersionCliente || data.cliente || 'VERSION');
-  const base = sanitizePathSegment(data.versionBase || '0', true); // preservar puntos en versión
-  const build = sanitizePathSegment(data.build || getTodayYYMMDD());
-  return `VERSION_${cliente}${base}_${build}`;
+  const baseLabel = `${data.nombreVersionCliente || data.cliente || 'VERSION'}_${data.versionBase || 'BASE'}`;
+  const base = sanitizePathSegment(baseLabel, true);
+  return `VERSION_${base}`;
 };
 
-const getFirstMatchPath = (result: any): string | null => {
-  if (!result) return null;
-  if (typeof result === 'string') return result;
-  if (Array.isArray(result)) return result[0] ?? null;
-  if (Array.isArray(result.matches)) return result.matches[0] ?? null;
-  if (typeof result.path === 'string') return result.path;
-  return null;
-};
 
 interface CrearVersionModalProps {
   isOpen: boolean;
@@ -348,6 +337,7 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   const [lastHistorialPath, setLastHistorialPath] = useState<string | null>(null);
   const [lastHistorialZip, setLastHistorialZip] = useState<string | null>(null);
   const [copiedHistorial, setCopiedHistorial] = useState<'folder' | 'zip' | null>(null);
+  const userClearedCommandRef = useRef<boolean>(false);
   const hasHistorialInfo = Boolean(lastHistorialPath || lastHistorialZip);
   const [lastPersonalizedCid, setLastPersonalizedCid] = useState<string>(() => {
     const prefs = loadPreferences();
@@ -362,6 +352,9 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   const lastMonitoredMd5Ref = useRef<string | null>(null);
   const lastMonitoredMtimeRef = useRef<number | null>(null);
   const checksumErrorShownRef = useRef<boolean>(false);
+  const hasDetectedAnyChangeRef = useRef<boolean>(false);
+  const cachedVersionFileRef = useRef<string | null>(null); // Cache para evitar búsqueda repetida
+  const cachedProjectRootRef = useRef<string | null>(null); // Cache del proyecto
   const parsedErrorMessage = useMemo(() => {
     const paragraphs: string[] = [];
     const bulletItems: string[] = [];
@@ -398,7 +391,7 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   const showChecksumIdenticalError = () => {
     if (checksumErrorShownRef.current) return;
     // Mostrar advertencia en el modal de espera (no en el modal global de error)
-    setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
+    setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
     checksumErrorShownRef.current = true;
   };
 
@@ -426,8 +419,8 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     const folderPath = getHistorialFolderPath();
     if (!folderPath) return null;
     await window.electronAPI.createDirectory(folderPath);
-    await window.electronAPI.createDirectory(`${folderPath}\\BASE`);
-    await window.electronAPI.createDirectory(`${folderPath}\\AUMENTO`);
+    await window.electronAPI.createDirectory(`${folderPath}\\Nombre Base`);
+    await window.electronAPI.createDirectory(`${folderPath}\\Nombre de Aumento`);
     historialFolderRef.current = folderPath;
     setLastHistorialPath(folderPath);
     return folderPath;
@@ -441,8 +434,9 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     aumentoFolderName?: string
   ) => {
     if (!window.electronAPI || !folderPath) return;
-    const baseName = baseFolderName || 'BASE';
-    const aumentoName = aumentoFolderName || 'AUMENTO';
+    // Usar nombres legibles: "Nombre Base" y "Nombre de Aumento"
+    const baseName = baseFolderName ? `Nombre Base (${baseFolderName})` : 'Nombre Base';
+    const aumentoName = aumentoFolderName ? `Nombre de Aumento (${aumentoFolderName})` : 'Nombre de Aumento';
     const checksumBaseLine = `${baseName}: ${md5Base || 'PENDIENTE'}`;
     const checksumAumentoLine = `${aumentoName}: ${md5Aumento || 'PENDIENTE'}`;
     const checksumsContent = md5Aumento
@@ -455,22 +449,36 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   };
 
   const zipHistorialFolder = async (folderPath: string): Promise<string | null> => {
-    if (!window.electronAPI?.zipArtifacts || !folderPath) return null;
+    if (!window.electronAPI?.zipArtifacts || !folderPath) {
+      console.error('❌ zipHistorialFolder: No electronAPI.zipArtifacts o folderPath vacío');
+      return null;
+    }
     try {
+      console.log('🔄 zipHistorialFolder: Iniciando ZIP de:', folderPath);
       const folderName = folderPath.split(/[/\\]/).filter(Boolean).pop() || `version_${Date.now()}`;
+      console.log(`📦 Nombre de carpeta para ZIP: ${folderName}`);
+      console.log(`📦 Parámetros zipArtifacts: files=[${folderPath}], zipName=${folderName}.zip, subfolder=${formData.cliente || folderName}`);
+      
       const zipResult = await window.electronAPI.zipArtifacts({
         files: [folderPath],
         zipName: `${folderName}.zip`,
         subfolder: formData.cliente || folderName
       });
+      
+      console.log('📦 zipHistorialFolder result:', zipResult);
       if (zipResult?.ok && zipResult.path) {
+        console.log('✅ ZIP creado exitosamente:', zipResult.path);
+        console.log(`   Contenido será: archivos de ${folderPath}`);
         historialZipRef.current = zipResult.path;
         setLastHistorialZip(zipResult.path);
         return zipResult.path;
+      } else {
+        console.warn('⚠️ zipArtifacts retornó sin ok o sin path:', zipResult);
       }
     } catch (zipError) {
-      console.warn('No se pudo generar el ZIP del historial:', zipError);
+      console.error('❌ Error en zipHistorialFolder:', zipError);
     }
+    console.warn('⚠️ zipHistorialFolder retornando null');
     return null;
   };
 
@@ -481,9 +489,15 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       if (!exists) return;
       const folderPath = historialFolderRef.current || await ensureHistorialFolder();
       if (!folderPath) return;
-      // Usar nombre dinámico: nombreVersionCliente + versionBase
+      // Usar nombre dinámico: nombreVersionCliente + versionBase con formato "Nombre Base"
       const baseFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionBase}`;
-      await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${baseFolderName}\\${formData.nombreArchivoBin}`);
+      const baseDisplayName = `Nombre Base`;
+      const copyResult = await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${baseDisplayName}\\${formData.nombreArchivoBin}`);
+      if (!copyResult?.ok) {
+        console.warn('⚠️ Error guardando binario BASE:', copyResult?.error);
+      } else {
+        console.log('✅ Binario BASE guardado en historial');
+      }
       await actualizarChecksumsFile(folderPath, checksumBase, undefined, baseFolderName, undefined);
     } catch (snapshotError) {
       console.warn('No se pudo guardar el binario BASE en el historial:', snapshotError);
@@ -491,37 +505,69 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   };
 
   const registrarAumentoEnHistorial = async (md5Base?: string, md5Aumento?: string) => {
-    if (!window.electronAPI) return { folderPath: null, zipPath: null };
+    console.log('🔍 registrarAumentoEnHistorial called with md5Base:', md5Base, 'md5Aumento:', md5Aumento);
+    if (!window.electronAPI) {
+      console.error('❌ electronAPI no disponible');
+      return { folderPath: null, zipPath: null };
+    }
     const folderPath = historialFolderRef.current || await ensureHistorialFolder();
-    if (!folderPath) return { folderPath: null, zipPath: null };
+    if (!folderPath) {
+      console.error('❌ No folderPath encontrado');
+      return { folderPath: null, zipPath: null };
+    }
     if (!formData.rutaCompilacion || !formData.nombreArchivoBin) {
       console.warn('No hay ruta/nombre de binario definidos para registrar el historial.');
       return { folderPath, zipPath: null };
     }
     const sourceBinPath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
     
-    // Nombres dinámicos de carpetas
+    // Nombres dinámicos de carpetas - usar "Nombre Base" y "Nombre de Aumento"
     const baseFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionBase}`;
     const aumentoFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionAumento}`;
+    const baseDisplayName = 'Nombre Base';
+    const aumentoDisplayName = 'Nombre de Aumento';
 
     try {
+      console.log('✅ Folder path:', folderPath);
       const exists = await window.electronAPI.fileExists(sourceBinPath);
+      console.log('📝 Archivo BIN existe:', exists);
       
       // Copiar archivo BASE si existe y tenemos checksum BASE
-      if (exists && md5Base && !md5Aumento) {
-        await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${baseFolderName}\\${formData.nombreArchivoBin}`);
+      if (exists && md5Base) {
+        console.log('📋 Copiando BASE:', sourceBinPath, '->', `${folderPath}\\${baseDisplayName}\\${formData.nombreArchivoBin}`);
+        const copyBaseResult = await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${baseDisplayName}\\${formData.nombreArchivoBin}`);
+        if (!copyBaseResult?.ok) {
+          console.warn('⚠️ Error copiando BASE:', copyBaseResult?.error);
+        } else {
+          console.log('✅ BASE copiado exitosamente');
+        }
       }
       
       // Copiar archivo AUMENTO si existe y tenemos checksum AUMENTO
       if (exists && md5Aumento) {
-        await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${aumentoFolderName}\\${formData.nombreArchivoBin}`);
+        console.log('📋 Copiando AUMENTO:', sourceBinPath, '->', `${folderPath}\\${aumentoDisplayName}\\${formData.nombreArchivoBin}`);
+        const copyAumentoResult = await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${aumentoDisplayName}\\${formData.nombreArchivoBin}`);
+        if (!copyAumentoResult?.ok) {
+          console.warn('⚠️ Error copiando AUMENTO:', copyAumentoResult?.error);
+        } else {
+          console.log('✅ AUMENTO copiado exitosamente');
+        }
       }
       
       await actualizarChecksumsFile(folderPath, md5Base, md5Aumento, baseFolderName, md5Aumento ? aumentoFolderName : undefined);
+      console.log('🔤 Checksums actualizados');
       const zipPath = await zipHistorialFolder(folderPath);
+      console.log('📦 zipPath retornado de zipHistorialFolder:', zipPath);
+      if (!zipPath) {
+        console.error('❌ zipHistorialFolder retornó null/undefined');
+        historialZipRef.current = null;
+      } else {
+        console.log('✅ ZIP generado correctamente:', zipPath);
+        historialZipRef.current = zipPath;
+      }
       return { folderPath, zipPath };
     } catch (historialError) {
-      console.warn('No se pudo completar el historial de versiones:', historialError);
+      console.error('❌ Error en registrarAumentoEnHistorial:', historialError);
       return { folderPath, zipPath: null };
     }
   };
@@ -619,6 +665,10 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   };
 
   const handleInputChange = (field: keyof CrearVersionData, value: any) => {
+    if (field === 'comandoCompilacion') {
+      const trimmed = (value || '').toString().trim();
+      userClearedCommandRef.current = trimmed === '';
+    }
     if (formAlert) {
       setFormAlert(null);
     }
@@ -642,6 +692,7 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       }
       
       try {
+        const commandToSave = newData.comandoCompilacion?.trim() || undefined;
         const preferencesToSave = {
           cliente: newData.cliente,
           terminal: newData.terminal,
@@ -664,11 +715,15 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
           // Campos de compilación automática
           rutaProyecto: newData.rutaProyecto,
           archivoVersion: newData.archivoVersion,
-          comandoCompilacion: newData.comandoCompilacion,
+          comandoCompilacion: commandToSave,
           compilePyMode: newData.compilePyMode,
           compilePyTarget: newData.compilePyTarget,
           incluirVersionAumento: newData.incluirVersionAumento,
         };
+        // No guardar comando vacío; si el usuario lo limpió, evitamos reinyectarlo
+        if (!commandToSave) {
+          delete preferencesToSave.comandoCompilacion;
+        }
         localStorage.setItem('versiones-app:preferencias-formulario', JSON.stringify(preferencesToSave));
       } catch (error) {
         console.error('Error guardando preferencias:', error);
@@ -688,184 +743,239 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     handleInputChange('incluirVersionAumento', nextValue as CrearVersionData['incluirVersionAumento']);
   };
 
-  // Función para actualizar archivo .h con nueva versión
-  const updateVersionInFile = async (filePath: string, newVersion: string): Promise<boolean> => {
-    try {
-      // Validar que los campos requeridos estén presentes
-      if (!filePath || !newVersion) {
-        console.error('❌ Faltan parámetros: filePath o newVersion');
-        return false;
-      }
-
-      // Normalizar la ruta (reemplazar / por \\)
-      const normalizedPath = filePath.replace(/\//g, '\\');
-      console.log(`📝 Actualizando ${normalizedPath} con versión ${newVersion}`);
-      
-      // Verificar que el archivo existe
-      const exists = await window.electronAPI.fileExists(normalizedPath);
-      if (!exists) {
-        console.error(`❌ El archivo no existe: ${normalizedPath}`);
-        return false;
-      }
-      
-      const result = await window.electronAPI.readTextFile(normalizedPath);
-      if (!result.ok || !result.content) {
-        console.error('❌ No se pudo leer el archivo:', result.error);
-        return false;
-      }
-      
-      let content = result.content;
-      let updated = false;
-      
-      // Pattern 1: #define VERSION "X.Y.Z" (preservar espacios)
-      const versionLinePattern = /(^\s*#define\s+VERSION\s+)("[^"]+")/gm;
-      if (versionLinePattern.test(content)) {
-        content = content.replace(versionLinePattern, (_full: string, prefix: string) => `${prefix}"${newVersion}"`);
-        updated = true;
-      }
-      
-      // Pattern 2: #define VERSION_MAJOR/MINOR/PATCH
-      const [major, minor, patch] = newVersion.split('.');
-      if (/#define\s+VERSION_MAJOR/.test(content)) {
-        if (major) content = content.replace(/(^\s*#define\s+VERSION_MAJOR\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${major}`);
-        if (minor) content = content.replace(/(^\s*#define\s+VERSION_MINOR\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${minor}`);
-        if (patch) content = content.replace(/(^\s*#define\s+VERSION_PATCH\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${patch}`);
-        updated = true;
-      }
-      
-      // Pattern 3: #define <CUALQUIER_NOMBRE> "PREFIJO_X_Y_Z" (formato con prefijo y guiones bajos)
-      // Busca CUALQUIER variable #define que tenga un valor con formato PREFIJO_DIGITOS_DIGITOS
-      // Ejemplos: APP_MAIN_VER, VERSION_MAIN, MAIN_VER, FIRMWARE_VER, etc.
-      const mainVerPattern = /#define\s+([A-Z_]+)\s+"([A-Za-z_]*\d+_\d+(?:_\d+)?)"/g;
-      let mainVerMatch;
-      const mainVerMatches = [];
-      
-      // Buscar TODAS las coincidencias
-      while ((mainVerMatch = mainVerPattern.exec(content)) !== null) {
-        mainVerMatches.push({
-          fullMatch: mainVerMatch[0],
-          varName: mainVerMatch[1],
-          currentValue: mainVerMatch[2]
-        });
-      }
-      
-      // Filtrar solo las que NO sean de fecha (no tengan 8 dígitos consecutivos como 20251118)
-      const validMainVerMatches = mainVerMatches.filter(m => 
-        !/^\d{8}$/.test(m.currentValue) && // No es fecha pura
-        !/^([A-Za-z_]+)?\d{8}$/.test(m.currentValue) // No termina en fecha YYYYMMDD
-      );
-      
-      if (validMainVerMatches.length > 0) {
-        // Tomar la primera coincidencia válida
-        const match = validMainVerMatches[0];
-        console.log(`Detectado #define ${match.varName} con valor: "${match.currentValue}"`);
-        
-        // Extraer el prefijo dinámicamente (cualquier letra/underscore al inicio)
-        // Ejemplos: "ENLACEAV1_20" -> "ENLACEAV", "BANCO2_5" -> "BANCO", "V1_0" -> "V"
-        const prefixMatch = match.currentValue.match(/^([A-Za-z_]*)/);
-        const prefix = prefixMatch ? prefixMatch[1] : '';
-        
-        // Usar la versión exactamente como la ingresó el usuario (mantener puntos)
-        const newMainVer = prefix ? `${prefix}${newVersion}` : newVersion;
-        
-        console.log(`Actualizando ${match.varName}: "${match.currentValue}" -> "${newMainVer}"`);
-        
-        // Reemplazar solo el valor entre comillas (preservar espacios)
-        const replacePattern = new RegExp(`(^\\s*#define\\s+${match.varName}\\s+)"[^"]+"`, 'gm');
-        content = content.replace(replacePattern, (_m: string, p1: string) => `${p1}"${newMainVer}"`);
-        updated = true;
-      }
-
-      // Pattern 3b: Igual que el anterior pero SIN comillas (#define VAR PREFIJO_X_Y)
-      if (!updated) {
-        const mainVerNoQuotes = /#define\s+([A-Z_]+)\s+([A-Za-z_]*\d+_\d+(?:_\d+)?)/g;
-        let nqMatch;
-        const nqMatches: Array<{ fullMatch: string; varName: string; currentValue: string }> = [];
-        while ((nqMatch = mainVerNoQuotes.exec(content)) !== null) {
-          nqMatches.push({ fullMatch: nqMatch[0], varName: nqMatch[1], currentValue: nqMatch[2] });
-        }
-        if (nqMatches.length > 0) {
-          const m = nqMatches[0];
-          const prefix = (m.currentValue.match(/^([A-Za-z_]*)/) || ['',''])[1];
-          // Mantener la versión exactamente como el usuario la ingresó
-          const replacement = `#define ${m.varName} ${prefix ? prefix + newVersion : newVersion}`;
-          console.log(`Actualizando ${m.varName}: ${m.currentValue} -> ${prefix ? prefix + newVersion : newVersion}`);
-          const replacePattern = new RegExp(`#define\\s+${m.varName}\\s+[A-Za-z_]*\\d+[._]\\d+(?:[._]\\d+)?`, 'g');
-          content = content.replace(replacePattern, replacement);
-          updated = true;
-        }
-      }
-      
-      // Pattern 4: #define <CUALQUIER_NOMBRE> "20251010" (formato fecha YYYYMMDD)
-      // Busca CUALQUIER variable que tenga un valor de 8 dígitos (formato fecha)
-      // Ejemplos: APP_SUB_VER, BUILD_DATE, VERSION_DATE, etc.
-      const subVerPattern = /#define\s+([A-Z_]+)\s+"(\d{8})"/g;
-      let subVerMatch;
-      const subVerMatches = [];
-      
-      while ((subVerMatch = subVerPattern.exec(content)) !== null) {
-        subVerMatches.push({
-          fullMatch: subVerMatch[0],
-          varName: subVerMatch[1],
-          currentValue: subVerMatch[2]
-        });
-      }
-      
-      if (subVerMatches.length > 0) {
-        const match = subVerMatches[0];
-        
-        // Generar fecha actual en formato YYYYMMDD
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const dateStr = `${year}${month}${day}`;
-        
-        console.log(`Detectado #define ${match.varName} con fecha: ${match.currentValue}`);
-        console.log(`Actualizando ${match.varName} a fecha actual: ${dateStr}`);
-        
-        // Reemplazar específicamente el valor entre comillas (preservar espacios)
-        const replacePattern = new RegExp(`(^\\s*#define\\s+${match.varName}\\s+)"\\d{8}"`, 'gm');
-        content = content.replace(replacePattern, (_m: string, p1: string) => `${p1}"${dateStr}"`);
-        updated = true;
-      }
-      
-      const otherVerPattern = /#define\s+([A-Z_]+(?:PARAM|CONFIG|BUILD)(?:_VERSION)?)\s+"([^"]+)"/g;
-      let otherMatch;
-      while ((otherMatch = otherVerPattern.exec(content)) !== null) {
-        console.log(`${otherMatch[1]} detectado con valor "${otherMatch[2]}" - se mantiene sin cambios`);
-      }
-      
-      if (!updated) {
-        const fallbackPattern = /(^\s*#define\s+([A-Z_]*VER[A-Z_]*|VERSION[A-Z_]*)\s+)"([^"\n]*?)(\d+(?:[._]\d+){1,3})([^"\n]*)"/gm;
-        let fbMatch = fallbackPattern.exec(content);
-        if (fbMatch) {
-          const prefix = fbMatch[1];
-          const pre = fbMatch[3] || '';
-          const post = fbMatch[5] || '';
-          // Mantener la versión exactamente como el usuario la ingresó
-          content = content.replace(fallbackPattern, `${prefix}"${pre}${newVersion}${post}"`);
-          updated = true;
-        }
-      }
-
-      if (!updated) {
-        console.error('❌ No se encontró ningún patrón de versión conocido en el archivo');
-        return false;
-      }
-      
-      const writeResult = await window.electronAPI.writeTextFile(normalizedPath, content);
-      if (!writeResult.ok) {
-        console.error('❌ No se pudo escribir el archivo:', writeResult.error);
-        return false;
-      }
-      
-      console.log('✅ Versión actualizada exitosamente');
-      return true;
-    } catch (error) {
-      console.error('❌ Error actualizando versión:', error);
-      return false;
+  // Función optimizada para buscar archivo de versión con cache y búsqueda inteligente
+  const findVersionFileFast = async (
+    projectRoot?: string,
+    manualEntry?: string,
+    headerHintPath?: string | null
+  ): Promise<string | null> => {
+    // Si el proyecto es el mismo y ya lo buscamos, usar cache
+    if (
+      projectRoot &&
+      projectRoot === cachedProjectRootRef.current &&
+      cachedVersionFileRef.current
+    ) {
+      console.log('📦 Usando archivo de versión en cache:', cachedVersionFileRef.current);
+      return cachedVersionFileRef.current;
     }
+
+    // Si se proporciona una ruta manual válida, usar esa
+    const manualVersionPath = resolveProjectFilePath(projectRoot, manualEntry);
+    if (manualVersionPath && await window.electronAPI.fileExists(manualVersionPath)) {
+      cachedVersionFileRef.current = manualVersionPath;
+      cachedProjectRootRef.current = projectRoot || null;
+      console.log('✅ Archivo de versión encontrado (manual):', manualVersionPath);
+      return manualVersionPath;
+    }
+
+    // Si hay sugerencia del sistema, usarla
+    if (headerHintPath && await window.electronAPI.fileExists(headerHintPath)) {
+      cachedVersionFileRef.current = headerHintPath;
+      cachedProjectRootRef.current = projectRoot || null;
+      console.log('✅ Archivo de versión encontrado (sugerencia):', headerHintPath);
+      return headerHintPath;
+    }
+
+    // Usar búsqueda inteligente del backend si está disponible
+    if (projectRoot && window.electronAPI.findVersionFile) {
+      try {
+        const versionSearchOptions = {
+          hintFile: manualEntry || undefined,
+          versionBase: formData.versionBase || undefined,
+          nombreVersionCliente: formData.nombreVersionCliente || undefined
+        };
+        
+        const found = await window.electronAPI.findVersionFile(projectRoot, versionSearchOptions);
+        if (found?.ok && found.path) {
+          cachedVersionFileRef.current = found.path;
+          cachedProjectRootRef.current = projectRoot;
+          console.log('🔎 Archivo de versión detectado:', found.path, found.reason ? `(${found.reason})` : '');
+          return found.path;
+        }
+      } catch (err) {
+        console.warn('Error en búsqueda de versión file:', err);
+      }
+    }
+
+    console.warn('⚠️ No se encontró archivo de versión');
+    return null;
+  };
+
+  const updateVersionInFile = async (filePath: string, newVersion: string): Promise<boolean> => {
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY = 250;
+    
+    const attemptUpdate = async (attempt: number = 1): Promise<boolean> => {
+      try {
+        if (!filePath || !newVersion) {
+          console.error('❌ Faltan parámetros: filePath o newVersion');
+          return false;
+        }
+
+
+        const normalizedPath = filePath.replace(/\//g, '\\');
+        console.log(`📝 Actualizando ${normalizedPath} con versión ${newVersion}${attempt > 1 ? ` (intento ${attempt}/${MAX_RETRIES})` : ''}`);
+        
+        const exists = await window.electronAPI.fileExists(normalizedPath);
+        if (!exists) {
+          console.error(`❌ El archivo no existe: ${normalizedPath}`);
+          return false;
+        }
+        
+        const result = await window.electronAPI.readTextFile(normalizedPath);
+        if (!result.ok || !result.content) {
+          if (attempt < MAX_RETRIES) {
+            console.warn(`⚠️ No se pudo leer el archivo (intento ${attempt}/${MAX_RETRIES}). Error: ${result.error}. Reintentando en ${RETRY_DELAY * attempt}ms...`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
+            return attemptUpdate(attempt + 1);
+          }
+          console.error('❌ No se pudo leer el archivo después de reintentos:', result.error);
+          return false;
+        }
+        
+        let content = result.content;
+        let updated = false;
+        
+        const versionLinePattern = /(^\s*#define\s+VERSION\s+)("[^"]+")/gm;
+        if (versionLinePattern.test(content)) {
+          content = content.replace(versionLinePattern, (_full: string, prefix: string) => `${prefix}"${newVersion}"`);
+          updated = true;
+        }
+        
+        const [major, minor, patch] = newVersion.split('.');
+        if (/#define\s+VERSION_MAJOR/.test(content)) {
+          if (major) content = content.replace(/(^\s*#define\s+VERSION_MAJOR\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${major}`);
+          if (minor) content = content.replace(/(^\s*#define\s+VERSION_MINOR\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${minor}`);
+          if (patch) content = content.replace(/(^\s*#define\s+VERSION_PATCH\s+)(\d+)/gm, (_m: string, p1: string) => `${p1}${patch}`);
+          updated = true;
+        }
+
+        const mainVerPattern = /#define\s+([A-Z_]+)\s+"([A-Za-z_]*\d+[._]\d+(?:[._]\d+)?)"/g;
+        let mainVerMatch;
+        const mainVerMatches = [];
+        
+        while ((mainVerMatch = mainVerPattern.exec(content)) !== null) {
+          mainVerMatches.push({
+            fullMatch: mainVerMatch[0],
+            varName: mainVerMatch[1],
+            currentValue: mainVerMatch[2]
+          });
+        }
+        
+        const validMainVerMatches = mainVerMatches.filter(m => 
+          !/^\d{8}$/.test(m.currentValue) &&
+          !/^([A-Za-z_]+)?\d{8}$/.test(m.currentValue)
+        );
+        
+        if (validMainVerMatches.length > 0) {
+          const match = validMainVerMatches[0];
+          console.log(`Detectado #define ${match.varName} con valor: "${match.currentValue}"`);
+          
+          const prefixMatch = match.currentValue.match(/^([A-Za-z_]*)/);
+          const prefix = prefixMatch ? prefixMatch[1] : '';
+          const newMainVer = prefix ? `${prefix}${newVersion}` : newVersion;
+          
+          console.log(`Actualizando ${match.varName}: "${match.currentValue}" -> "${newMainVer}"`);
+          
+          const replacePattern = new RegExp(`(^\\s*#define\\s+${match.varName}\\s+)"[^"]+"`, 'gm');
+          content = content.replace(replacePattern, (_m: string, p1: string) => `${p1}"${newMainVer}"`);
+          updated = true;
+        }
+
+        if (!updated) {
+          const mainVerNoQuotes = /#define\s+([A-Z_]+)\s+([A-Za-z_]*\d+_\d+(?:_\d+)?)/g;
+          let nqMatch;
+          const nqMatches: Array<{ fullMatch: string; varName: string; currentValue: string }> = [];
+          while ((nqMatch = mainVerNoQuotes.exec(content)) !== null) {
+            nqMatches.push({ fullMatch: nqMatch[0], varName: nqMatch[1], currentValue: nqMatch[2] });
+          }
+          if (nqMatches.length > 0) {
+            const m = nqMatches[0];
+            const prefix = (m.currentValue.match(/^([A-Za-z_]*)/) || ['',''])[1];
+            const replacement = `#define ${m.varName} ${prefix ? prefix + newVersion : newVersion}`;
+            console.log(`Actualizando ${m.varName}: ${m.currentValue} -> ${prefix ? prefix + newVersion : newVersion}`);
+            const replacePattern = new RegExp(`#define\\s+${m.varName}\\s+[A-Za-z_]*\\d+[._]\\d+(?:[._]\\d+)?`, 'g');
+            content = content.replace(replacePattern, replacement);
+            updated = true;
+          }
+        }
+
+        const subVerPattern = /#define\s+([A-Z_]+)\s+"(\d{8})"/g;
+        let subVerMatch;
+        const subVerMatches = [];
+        
+        while ((subVerMatch = subVerPattern.exec(content)) !== null) {
+          subVerMatches.push({
+            fullMatch: subVerMatch[0],
+            varName: subVerMatch[1],
+            currentValue: subVerMatch[2]
+          });
+        }
+        
+        if (subVerMatches.length > 0) {
+          const match = subVerMatches[0];
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const dateStr = `${year}${month}${day}`;
+          
+          console.log(`Detectado #define ${match.varName} con fecha: ${match.currentValue}`);
+          console.log(`Actualizando ${match.varName} a fecha actual: ${dateStr}`);
+          
+          const replacePattern = new RegExp(`(^\\s*#define\\s+${match.varName}\\s+)"\\d{8}"`, 'gm');
+          content = content.replace(replacePattern, (_m: string, p1: string) => `${p1}"${dateStr}"`);
+          updated = true;
+        }
+        
+        const otherVerPattern = /#define\s+([A-Z_]+(?:PARAM|CONFIG|BUILD)(?:_VERSION)?)\s+"([^"]+)"/g;
+        let otherMatch;
+        while ((otherMatch = otherVerPattern.exec(content)) !== null) {
+          console.log(`${otherMatch[1]} detectado con valor "${otherMatch[2]}" - se mantiene sin cambios`);
+        }
+        
+        if (!updated) {
+          const fallbackPattern = /(^\s*#define\s+([A-Z_]*VER[A-Z_]*|VERSION[A-Z_]*)\s+)"([^"\n]*?)(\d+(?:[._]\d+){1,3})([^"\n]*)"/gm;
+          let fbMatch = fallbackPattern.exec(content);
+          if (fbMatch) {
+            const prefix = fbMatch[1];
+            const pre = fbMatch[3] || '';
+            const post = fbMatch[5] || '';
+            content = content.replace(fallbackPattern, `${prefix}"${pre}${newVersion}${post}"`);
+            updated = true;
+          }
+        }
+
+        if (!updated) {
+          console.error('❌ No se encontró ningún patrón de versión conocido en el archivo');
+          return false;
+        }
+        
+        const writeResult = await window.electronAPI.writeTextFile(normalizedPath, content);
+        if (!writeResult.ok) {
+          if (attempt < MAX_RETRIES) {
+            console.warn(`⚠️ No se pudo escribir el archivo (intento ${attempt}/${MAX_RETRIES}). Error: ${writeResult.error}. Reintentando en ${RETRY_DELAY * attempt}ms...`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
+            return attemptUpdate(attempt + 1);
+          }
+          console.error('❌ No se pudo escribir el archivo después de reintentos:', writeResult.error);
+          return false;
+        }
+        
+        console.log('✅ Versión actualizada exitosamente');
+        return true;
+      } catch (error) {
+        if (attempt < MAX_RETRIES) {
+          console.warn(`⚠️ Error actualizando versión (intento ${attempt}/${MAX_RETRIES}). Reintentando en ${RETRY_DELAY * attempt}ms...`, error);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
+          return attemptUpdate(attempt + 1);
+        }
+        console.error('❌ Error actualizando versión después de reintentos:', error);
+        return false;
+      }
+    };
+
+    return attemptUpdate();
   };
 
   const capturarPantalla = async (carpetaBase: string): Promise<void> => {
@@ -896,7 +1006,8 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   const crearCorreoOutlook = async (
     md5Aumento: string | '',
     carpetaOneDrive?: string | null,
-    historialZipPath?: string | null
+    historialZipPath?: string | null,
+    md5Base?: string | null
   ): Promise<string> => {
     try {
       if (!window.electronAPI) {
@@ -904,7 +1015,7 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
         return '';
       }
 
-      const { subject, body } = crearCorreoHtml(formData as any, md5Aumento || undefined, carpetaOneDrive || null, formData.checksumBase);
+      const { subject, body } = crearCorreoHtml(formData as any, md5Aumento || undefined, carpetaOneDrive || null, md5Base || formData.checksumBase);
 
       const attachments: string[] = [];
       if (historialZipPath) {
@@ -942,9 +1053,10 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   };
 
   // Función centralizada para crear email con manejo de progress
-  const handleCreateEmail = async (md5Aumento: string | '', historialZipPath?: string | null): Promise<string> => {
+  const handleCreateEmail = async (md5Aumento: string | '', historialZipPath?: string | null, md5Base?: string | null): Promise<string> => {
+    console.log('📧 handleCreateEmail llamado con historialZipPath:', historialZipPath, 'md5Base:', md5Base);
     setProgressStep('📧 Generando correo en Outlook...');
-    const asuntoCorreo = await crearCorreoOutlook(md5Aumento, undefined, historialZipPath);
+    const asuntoCorreo = await crearCorreoOutlook(md5Aumento, undefined, historialZipPath, md5Base);
     return asuntoCorreo;
   };
 
@@ -1118,9 +1230,12 @@ ${formData.linksOneDrive || 'N/A'}
     }
   };
 
-  const startFileMonitoring = () => {
+  const startFileMonitoring = (baseChecksumOverride?: string) => {
     if (!formData.rutaCompilacion || !formData.nombreArchivoBin) return;
     const binFilePath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
+    
+    // Usar el checksum pasado como parámetro o el del estado
+    const checksumBaseToUse = baseChecksumOverride || formData.checksumBase;
 
     if (checkFileIntervalRef.current) {
       clearInterval(checkFileIntervalRef.current);
@@ -1129,6 +1244,7 @@ ${formData.linksOneDrive || 'N/A'}
     setCompilationDetected(false);
     setChecksumWarning('');
     checksumErrorShownRef.current = false;
+    hasDetectedAnyChangeRef.current = false; // Resetear bandera de cambios
 
     (async () => {
       try {
@@ -1142,9 +1258,10 @@ ${formData.linksOneDrive || 'N/A'}
         const md5Initial = await window.electronAPI.computeMd5(binFilePath);
         lastMonitoredMd5Ref.current = md5Initial;
         // Si no existe checksum BASE aún, usar el MD5 actual como referencia BASE
-        if (!formData.checksumBase && md5Initial) {
+        if (!checksumBaseToUse && md5Initial) {
           setFormData(prev => ({ ...prev, checksumBase: md5Initial! }));
         }
+        console.log(`🎯 Monitoreo iniciado - BASE esperado: ${checksumBaseToUse?.substring(0, 12) || 'ninguno'}`);
       } catch {
         lastMonitoredMd5Ref.current = null;
       }
@@ -1162,41 +1279,54 @@ ${formData.linksOneDrive || 'N/A'}
         );
         const md5Changed = Boolean(lastMonitoredMd5Ref.current && md5Current !== lastMonitoredMd5Ref.current);
 
-        console.log('🔍 Monitoreo:', {
+        console.log('🔍 Monitoreo de compilación:', {
           mtimeChanged,
           md5Changed,
-          md5Current: md5Current.substring(0, 8),
-          checksumBase: formData.checksumBase?.substring(0, 8),
-          sonIguales: md5Current === formData.checksumBase
+          md5Current: md5Current.substring(0, 12),
+          md5Last: lastMonitoredMd5Ref.current?.substring(0, 12),
+          checksumBase: checksumBaseToUse?.substring(0, 12),
+          sonIguales: md5Current === checksumBaseToUse,
+          archivo: binFilePath
         });
 
         // Si detectamos cambio en el archivo (por mtime o MD5)
         if (mtimeChanged || md5Changed) {
+          hasDetectedAnyChangeRef.current = true; // Marcar que hubo al menos un cambio
           console.log('🔔 Cambio detectado en el archivo - Nueva compilación detectada');
-          
-          // IMPORTANTE: Limpiar advertencia previa al detectar nueva compilación
-          setChecksumWarning('');
+          console.log(`   MD5 anterior: ${lastMonitoredMd5Ref.current?.substring(0, 12)}`);
+          console.log(`   MD5 actual: ${md5Current.substring(0, 12)}`);
+          console.log(`   MD5 BASE esperado: ${checksumBaseToUse?.substring(0, 12)}`);
+
+          // Al detectar cambio, ocultar cualquier mensaje previo mientras compila
+          if (checksumErrorShownRef.current || checksumWarning) {
+            console.log('🔄 Nueva compilación detectada - ocultando mensajes previos');
+            setChecksumWarning('');
+          }
           checksumErrorShownRef.current = false;
-          
-          // Verificar si el MD5 actual es igual al BASE
-          if (formData.checksumBase && md5Current === formData.checksumBase) {
-            console.log('❌ CHECKSUMS IDÉNTICOS - Compilación inválida');
-            // Checksum idéntico al BASE: mostrar advertencia clara
-            setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
+          setCompilationDetected(false);
+
+          // Actualizar refs y esperar siguiente tick para evaluar checksums
+          lastMonitoredMtimeRef.current = mtime;
+          lastMonitoredMd5Ref.current = md5Current;
+          return;
+        }
+
+        // Evaluar estado cuando no hay cambios adicionales (archivo estabilizado)
+        if (hasDetectedAnyChangeRef.current && checksumBaseToUse) {
+          if (md5Current === checksumBaseToUse && !checksumErrorShownRef.current) {
+            console.log('❌ CHECKSUMS IDÉNTICOS - Archivo estabilizado con el mismo MD5');
+            setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
             setCompilationDetected(false);
-            showChecksumIdenticalError();
-          } else {
-            console.log('✅ MD5 diferente al BASE - Compilación válida');
-            // MD5 es diferente al BASE: habilitar y limpiar advertencias
-            if (md5Changed) {
-              console.log('✅ Habilitando botón Finalizar');
-              setChecksumWarning('');
-              checksumErrorShownRef.current = false;
-              setCompilationDetected(true);
-              if (checkFileIntervalRef.current) {
-                clearInterval(checkFileIntervalRef.current);
-                checkFileIntervalRef.current = null;
-              }
+            checksumErrorShownRef.current = true;
+          } else if (md5Current !== checksumBaseToUse && !compilationDetected) {
+            console.log('✅ MD5 diferente al BASE tras cambio - compilación válida');
+            setChecksumWarning('');
+            checksumErrorShownRef.current = false;
+            setCompilationDetected(true);
+            // Si queremos detener el monitoreo tras éxito, descomentar:
+            if (checkFileIntervalRef.current) {
+              clearInterval(checkFileIntervalRef.current);
+              checkFileIntervalRef.current = null;
             }
           }
         }
@@ -1206,7 +1336,7 @@ ${formData.linksOneDrive || 'N/A'}
       } catch (err) {
         console.error('❌ Error en monitoreo:', err);
       }
-    }, 1000);
+    }, 300);
   };
 
   useEffect(() => {
@@ -1241,8 +1371,11 @@ ${formData.linksOneDrive || 'N/A'}
     detectTargetsTimeoutRef.current = setTimeout(async () => {
       if (cancelled) return;
       try {
-        const compileResult = await electronAPI.findFiles(rutaProyecto, ['compile.py', 'Compile.py', 'compile.sh', 'Makefile', 'makefile']);
-        const binResult = await electronAPI.findFiles(rutaProyecto, ['.bin']);
+        // Paralelizar búsquedas de archivos de compilación y binarios para optimizar IO
+        const [compileResult, binResult] = await Promise.all([
+          electronAPI.findFiles(rutaProyecto, ['compile.py', 'Compile.py', 'compile.sh', 'Makefile', 'makefile']),
+          electronAPI.findFiles(rutaProyecto, ['.bin'])
+        ]);
 
         if (cancelled) return;
 
@@ -1253,21 +1386,25 @@ ${formData.linksOneDrive || 'N/A'}
 
         if (compileResult?.ok && Array.isArray(compileResult.matches) && compileResult.matches.length > 0) {
           const found = compileResult.matches[0];
-          const parts = found.split(/[/\\]/);
-          const scriptName = parts.pop() || found;
-          const scriptDir = parts.join('\\');
+          const fileStillExists = await window.electronAPI.fileExists(found);
+          
+          if (fileStillExists) {
+            const parts = found.split(/[/\\]/);
+            const scriptName = parts.pop() || found;
+            const scriptDir = parts.join('\\');
 
-          if (/\.py$/i.test(scriptName)) {
-            detectedCommand = `py ${scriptName}`;
-          } else if (/makefile/i.test(scriptName)) {
-            detectedCommand = 'make';
-          } else if (/\.sh$/i.test(scriptName)) {
-            detectedCommand = `bash ${scriptName}`;
-          } else {
-            detectedCommand = scriptName;
+            if (/\.py$/i.test(scriptName)) {
+              detectedCommand = `py ${scriptName}`;
+            } else if (/makefile/i.test(scriptName)) {
+              detectedCommand = 'make';
+            } else if (/\.sh$/i.test(scriptName)) {
+              detectedCommand = `bash ${scriptName}`;
+            } else {
+              detectedCommand = scriptName;
+            }
+
+            detectedScriptDir = scriptDir || rutaProyecto;
           }
-
-          detectedScriptDir = scriptDir || rutaProyecto;
         }
 
         if (binResult?.ok && Array.isArray(binResult.matches) && binResult.matches.length > 0) {
@@ -1303,12 +1440,32 @@ ${formData.linksOneDrive || 'N/A'}
           }
         }
 
+        const allowDetectedCommand = !userClearedCommandRef.current;
+
+        // Verificar si el comando actual hace referencia a un archivo que ya no existe
+        if (allowDetectedCommand && formData.comandoCompilacion && !detectedCommand) {
+          const currentCommandMatch = formData.comandoCompilacion.match(/(?:py|python|bash|sh)\s+([^\s]+)/i);
+          if (currentCommandMatch) {
+            const scriptFileName = currentCommandMatch[1];
+            const possiblePath = formData.rutaProyecto ? `${formData.rutaProyecto}\\${scriptFileName}` : scriptFileName;
+            const fileStillExists = await window.electronAPI.fileExists(possiblePath);
+            
+            if (!fileStillExists) {
+              setFormData(prev => ({
+                ...prev,
+                comandoCompilacion: ''
+              }));
+              console.log(`🗑️ Comando de compilación limpiado: archivo ${scriptFileName} no existe`);
+            }
+          }
+        }
+
         if (detectedCommand || detectedBinDir || detectedBinName || (!formData.rutaCompilacion && detectedScriptDir)) {
           setFormData(prev => {
             const next = { ...prev };
             let changed = false;
 
-            if (detectedCommand && next.comandoCompilacion !== detectedCommand) {
+            if (allowDetectedCommand && detectedCommand && next.comandoCompilacion !== detectedCommand) {
               next.comandoCompilacion = detectedCommand;
               changed = true;
             }
@@ -1335,7 +1492,7 @@ ${formData.linksOneDrive || 'N/A'}
       } finally {
         detectTargetsTimeoutRef.current = null;
       }
-    }, 600);
+    }, 250); // Optimizado: detección más rápida de scripts/binarios
 
     return () => {
       cancelled = true;
@@ -1418,7 +1575,7 @@ ${formData.linksOneDrive || 'N/A'}
         setProgressStep('⚙️ Procesando versión BASE...');
         
         if (!formData.rutaCompilacion || !formData.nombreArchivoBin) {
-          setErrorModal({ show: true, title: '❌ Faltan datos', message: 'Debes proporcionar la ruta de compilación y el nombre del archivo .bin' });
+          setErrorModal({ show: true, title: 'Faltan datos', message: 'Debes proporcionar la ruta de compilación y el nombre del archivo .bin' });
           setIsCalculatingChecksums(false);
           setShowProgressModal(false);
           isSubmittingRef.current = false;
@@ -1426,19 +1583,60 @@ ${formData.linksOneDrive || 'N/A'}
         }
 
         const binFilePath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
+        
+        if ((formData.rutaProyecto && formData.archivoVersion && formData.comandoCompilacion) && (formData.incluirVersionAumento ?? false)) {
+          setShowProgressModal(false);
+          setIsCalculatingChecksums(false);
+          isSubmittingRef.current = false;
+          console.log('✅ Flujo automático: BASE + AUMENTO iniciado');
+          await handleAumentoYes(formData.checksumBase);
+          return;
+        }
+
         let md5Base: string | null = null;
 
-        // En modo Electron, calcular MD5; en modo web, usar valor manual si existe
         if (window.electronAPI?.computeMd5) {
           md5Base = await window.electronAPI.computeMd5(binFilePath);
+
           if (!md5Base) {
-            setShowProgressModal(false);
-            setIsCalculatingChecksums(false);
-            isSubmittingRef.current = false;
-            setErrorModal({ show: true, title: '❌ Archivo no encontrado', message: `No se encontró el archivo .bin en la ruta:\n\n${binFilePath}\n\nVerifica que hayas compilado la versión BASE correctamente.` });
-            return;
+            console.warn('⚠️ .bin BASE aún no existe.');
+            
+            if ((formData.incluirVersionAumento ?? false) && formData.comandoCompilacion && window.electronAPI?.runCompilation) {
+              console.log('🔨 Compilando BASE automáticamente en modo manual...');
+              setProgressStep('🔨 Compilando BASE automáticamente...');
+              const compilationDir = formData.rutaCompilacion || formData.rutaProyecto || '';
+              const compileResult = await window.electronAPI.runCompilation(formData.comandoCompilacion, compilationDir);
+              if (compileResult.ok) {
+                console.log('✅ BASE compilado automáticamente');
+                // Intentar calcular MD5 de nuevo
+                md5Base = await window.electronAPI.computeMd5(binFilePath);
+              } else {
+                console.error('❌ Error compilando BASE:', compileResult.error);
+                setShowProgressModal(false);
+                setIsCalculatingChecksums(false);
+                isSubmittingRef.current = false;
+                setErrorModal({ show: true, title: 'Error compilando BASE', message: `No se pudo compilar BASE automáticamente.\n\n${compileResult.error}` });
+                return;
+              }
+            }
+            
+            if (!md5Base) {
+              md5Base = formData.checksumBase || null;
+              if (!md5Base) {
+                setShowProgressModal(false);
+                setIsCalculatingChecksums(false);
+                isSubmittingRef.current = false;
+                setErrorModal({
+                  show: true,
+                  title: 'Falta archivo .bin o checksum',
+                  message: 'El .bin no existe. Compila y presiona Finalizar de nuevo.'
+                });
+                return;
+              }
+            }
+          } else {
+            console.log('✅ MD5 BASE calculado:', md5Base);
           }
-          console.log('✅ MD5 BASE calculado:', md5Base);
         } else {
           // Modo web: usar checksum manual ingresado
           md5Base = formData.checksumBase || null;
@@ -1465,7 +1663,7 @@ ${formData.linksOneDrive || 'N/A'}
           isSubmittingRef.current = false;
           return;
         } else {
-          await handleAumentoYes();
+          await handleAumentoYes(md5Base);
           isSubmittingRef.current = false;
           return;
         }
@@ -1484,7 +1682,7 @@ ${formData.linksOneDrive || 'N/A'}
     }
   };
 
-  const handleAumentoYes = async () => {
+  const handleAumentoYes = async (checksumBase?: string) => {
     checksumErrorShownRef.current = false;
     
     const tieneCompilacionAuto = !!(formData.rutaProyecto && formData.archivoVersion && formData.comandoCompilacion);
@@ -1494,7 +1692,7 @@ ${formData.linksOneDrive || 'N/A'}
     } else {
       setCompilationDetected(false);
       setWaitingForAumentoCompile(true);
-      startFileMonitoring();
+      startFileMonitoring(checksumBase);
     }
   };
 
@@ -1523,7 +1721,7 @@ ${formData.linksOneDrive || 'N/A'}
         setIsCalculatingChecksums(false);
         setErrorModal({ 
           show: true, 
-          title: '❌ Configuración incompleta', 
+          title: 'Configuración incompleta', 
           message: 'Faltan campos de compilación automática:\n\n' +
                    `Ruta proyecto: ${formData.rutaProyecto || 'FALTA'}\n` +
                    `Archivo versión: ${formData.archivoVersion || 'AUTO (se buscará)'}\n` +
@@ -1539,80 +1737,38 @@ ${formData.linksOneDrive || 'N/A'}
       const isCompilePy = /compile\.py/i.test(formData.comandoCompilacion || '');
       const stdinData = isCompilePy ? `${formData.compilePyMode || '2'}\n${formData.compilePyTarget || '2'}\n` : undefined;
 
-      setProgressStep('🔍 Buscando archivo de versión...');
+      setProgressStep('⚙️ Iniciando proceso...');
       const projectRoot = formData.rutaProyecto ? normalizeWindowsSlashes(formData.rutaProyecto) : '';
       const versionSearchBase = projectRoot || formData.rutaProyecto || '';
       let versionFilePath = '';
       let compilationDir = versionSearchBase;
       let originalVersionContent: string | null = null;
       const manualEntry = formData.archivoVersion?.trim();
-      const manualVersionPath = resolveProjectFilePath(projectRoot, manualEntry);
       const headerHintPath = artifactHints.headerPath ? normalizeWindowsSlashes(artifactHints.headerPath) : null;
 
-      if (manualEntry) {
-        let manualCandidate = manualVersionPath;
-
-        const candidateExists = manualCandidate ? await window.electronAPI.fileExists(manualCandidate) : false;
-        if (!candidateExists) {
-          manualCandidate = null;
-        }
-
-        if (!manualCandidate && versionSearchBase) {
-          try {
-            const manualSearch = await window.electronAPI.findFiles(versionSearchBase, [manualEntry]);
-            const located = getFirstMatchPath(manualSearch);
-            if (located) {
-              manualCandidate = normalizeWindowsSlashes(located);
-            }
-          } catch (manualSearchError) {
-            console.warn('No se pudo localizar el archivo indicado manualmente:', manualSearchError);
-          }
-        }
-
-        if (!manualCandidate && headerHintPath) {
-          manualCandidate = headerHintPath;
-        }
-
-        if (manualCandidate && await window.electronAPI.fileExists(manualCandidate)) {
-          versionFilePath = manualCandidate;
-          console.log('📄 Archivo de versión definido manualmente:', manualCandidate);
-        } else if (manualVersionPath) {
-          console.warn(`⚠️ No se encontró el archivo proporcionado (${manualVersionPath}). Se intentará con la detección automática.`);
-        }
-      }
-
-      const versionSearchOptions = {
-        hintFile: formData.archivoVersion || undefined,
-        versionBase: formData.versionBase || undefined,
-        nombreVersionCliente: formData.nombreVersionCliente || undefined
-      };
-
-      if (!versionFilePath && versionSearchBase) {
-        const found = await window.electronAPI.findVersionFile(versionSearchBase, versionSearchOptions);
-        if (found?.ok && found.path) {
-          versionFilePath = found.path;
-          console.log('🔎 Archivo de versión detectado:', found.path, found.reason ? `(${found.reason})` : '');
-        }
-      }
+      // Usar búsqueda optimizada con cache
+      versionFilePath = await findVersionFileFast(projectRoot, manualEntry, headerHintPath) || '';
 
       if (!versionFilePath || !(await window.electronAPI.fileExists(versionFilePath))) {
         setShowProgressModal(false);
         setIsCalculatingChecksums(false);
         setErrorModal({ 
           show: true, 
-          title: '❌ Archivo no encontrado', 
-          message: `No se encontró el archivo de versión.\n\nRuta del proyecto: ${versionSearchBase || '—'}\nArchivo indicado: ${manualEntry || '—'}\nSugerencia detectada: ${headerHintPath || '—'}\n\nEl sistema buscó archivos como appdef.h, version.h, etc., pero no encontró ninguno con definiciones #define VERSION.\n\nVerifica que el proyecto esté correcto.` 
+          title: 'Archivo no encontrado', 
+          message: `No se encontró el archivo de versión.\n\nRuta del proyecto: ${versionSearchBase || '—'}\nArchivo indicado: ${manualEntry || '—'}\nSugerencia detectada: ${headerHintPath || '—'}\n\nVerifica que el archivo existe en la ruta indicada.` 
         });
         return;
       }
 
       setProgressStep('🧪 Verificando/actualizando versión BASE en código...');
+      let baseVersionContent: string | null = null;
       try {
         if (versionFilePath && formData.versionBase) {
           const currentContent = await window.electronAPI.readTextFile(versionFilePath);
           if (currentContent?.ok && currentContent.content) {
+            baseVersionContent = currentContent.content;
             const basePattern = new RegExp(`"${formData.versionBase.replace(/\./g, '\\.')}"`, 'i');
-            if (!basePattern.test(currentContent.content)) {
+            if (baseVersionContent && !basePattern.test(baseVersionContent)) {
               await updateVersionInFile(versionFilePath, formData.versionBase);
             }
           }
@@ -1648,32 +1804,54 @@ ${formData.linksOneDrive || 'N/A'}
       setFormData(prev => ({ ...prev, checksumBase: checksumBaseAuto }));
       await snapshotBaseBinary(binFilePath, checksumBaseAuto);
 
-      try {
-        const readOriginal = await window.electronAPI.readTextFile(versionFilePath);
-        if (readOriginal?.ok && readOriginal.content) {
-          originalVersionContent = readOriginal.content;
-        }
-      } catch {}
+      if (!originalVersionContent && versionFilePath) {
+        try {
+          const readOriginal = await window.electronAPI.readTextFile(versionFilePath);
+          if (readOriginal?.ok && readOriginal.content) {
+            originalVersionContent = readOriginal.content;
+          }
+        } catch {}
+      }
 
       setProgressStep('📝 Actualizando versión AUMENTO en código...');
       console.log('📝 Editando archivo:', versionFilePath);
+      
       const updateResult = await updateVersionInFile(versionFilePath, formData.versionAumento);
       
       if (!updateResult) {
-        setShowProgressModal(false);
-        setIsCalculatingChecksums(false);
-        setErrorModal({ 
-          show: true, 
-          title: '❌ Error', 
-          message: `No se pudo actualizar el archivo de versión.\n\nArchivo: ${versionFilePath}\n\nVerifica que:\n• Tengas permisos de escritura\n• El archivo no esté en uso\n• Contenga #define VERSION` 
-        });
-        return;
+        console.error('❌ FALLO CRÍTICO: No se pudo actualizar la versión AUMENTO en el archivo de código.');
+        console.error(`   Archivo: ${versionFilePath}`);
+        console.error(`   Versión a establecer: ${formData.versionAumento}`);
+        console.error('   Posibles causas: Archivo locked, permisos insuficientes, patrón de versión no reconocido');
+        console.warn('⚠️ Continuando de todas formas, pero la compilación usará la versión anterior del archivo...');
+        setProgressStep('⚠️ ADVERTENCIA: No se actualizó versión. Compilando de todas formas...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      try {
+        const checkContent = await window.electronAPI.readTextFile(versionFilePath);
+        if (checkContent?.ok && checkContent.content) {
+          const versionNumbers = formData.versionAumento.replace(/\./g, '[._]');
+          const versionPatterns = [
+            new RegExp(`"${formData.versionAumento.replace(/\./g, '\\.')}`),
+            new RegExp(versionNumbers),
+            new RegExp(`[A-Z_]*${versionNumbers}`)
+          ];
+          
+          const found = versionPatterns.some(pattern => pattern.test(checkContent.content || ''));
+          if (!found) {
+            console.warn('⚠️ Advertencia: No se detectó la versión AUMENTO en el formato esperado. La compilación puede usar una versión diferente.');
+          } else {
+            console.log('✅ Versión AUMENTO verificada en el archivo');
+          }
+        }
+      } catch (verifError) {
+        console.warn('No se pudo verificar contenido de versión tras actualización:', verifError);
       }
 
       setProgressStep('🔨 Compilando versión AUMENTO...');
       console.log('🔍 Comando de compilación:', formData.comandoCompilacion);
       console.log('🔍 Directorio de trabajo:', compilationDir);
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       const compileResult = await window.electronAPI.runCompilation(
         formData.comandoCompilacion!,
@@ -1723,58 +1901,87 @@ ${formData.linksOneDrive || 'N/A'}
         setTimeout(() => {
           setShowProgressModal(false);
           setIsCalculatingChecksums(false);
-          setChecksumWarning(CHECKSUM_RECOMPILE_MESSAGE);
+          setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
           setCompilationDetected(false);
           setWaitingForAumentoCompile(true);
           showChecksumIdenticalError();
           startFileMonitoring();
-        }, 1200);
+        }, 500);
         return;
       }
 
       console.log('✅ MD5 AUMENTO:', md5Aumento);
       setFormData(prev => ({ ...prev, checksumAumento: md5Aumento }));
 
-      setProgressStep('📦 Actualizando historial y ZIP...');
-      const historialInfo = await registrarAumentoEnHistorial(checksumBaseAuto, md5Aumento);
-      historialZipPath = historialInfo.zipPath || historialZipRef.current;
-
-      setProgressStep('Restableciendo version BASE en el codigo...');
-      try {
-        if (originalVersionContent) {
-          const restoreResult = await window.electronAPI.writeTextFile(versionFilePath, originalVersionContent);
-          if (!restoreResult.ok) {
-            console.warn('No se pudo restaurar el archivo a su estado original. Intentando fijar a version BASE...');
-            if (formData.versionBase) {
+      // Paralelizar: historial ZIP + restauración versión + creación carpetas
+      setProgressStep('📦 Procesando historial, archivos y carpetas...');
+      
+      // Ejecutar en paralelo operaciones independientes
+      const [historialInfo, carpetaCreada] = await Promise.all([
+        // Registrar en historial y generar ZIP
+        (async () => {
+          const info = await registrarAumentoEnHistorial(checksumBaseAuto, md5Aumento);
+          return info.zipPath || historialZipRef.current;
+        })(),
+        // Restaurar versión BASE
+        (async () => {
+          try {
+            if (originalVersionContent) {
+              const restoreResult = await window.electronAPI.writeTextFile(versionFilePath, originalVersionContent);
+              if (!restoreResult.ok) {
+                console.warn('No se pudo restaurar el archivo a su estado original. Intentando fijar a version BASE...');
+                if (formData.versionBase) {
+                  await updateVersionInFile(versionFilePath, formData.versionBase);
+                }
+              } else {
+                console.log('Archivo de versión restaurado al estado BASE (original)');
+              }
+            } else if (formData.versionBase) {
               await updateVersionInFile(versionFilePath, formData.versionBase);
             }
-          } else {
-            console.log('Archivo de versión restaurado al estado BASE (original)');
+          } catch (e) {
+            console.warn('Advertencia al restaurar la versión base:', e);
           }
-        } else if (formData.versionBase) {
-          await updateVersionInFile(versionFilePath, formData.versionBase);
+
+          // Crear estructura de carpetas
+          return await crearEstructuraCarpetas(formData.checksumBase, md5Aumento);
+        })()
+      ]).catch(err => {
+        console.error('Error en procesamiento paralelo:', err);
+        return [null, null];
+      });
+
+      historialZipPath = historialInfo || historialZipRef.current;
+
+      // Verificar que el ZIP existe antes de usarlo
+      if (historialZipPath && window.electronAPI?.fileExists) {
+        const zipExists = await window.electronAPI.fileExists(historialZipPath);
+        if (zipExists) {
+          console.log('✅ ZIP verificado y existe:', historialZipPath);
+        } else {
+          console.warn('⚠️ ZIP no existe en:', historialZipPath, '- retentando...');
+          // Esperar un poco e intentar de nuevo por si aún se está escribiendo
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const zipExistsRetry = await window.electronAPI.fileExists(historialZipPath);
+          if (!zipExistsRetry) {
+            console.error('❌ ZIP definitivamente no existe. El adjunto NO se enviará.');
+            historialZipPath = null;
+          }
         }
-      } catch (e) {
-        console.warn('Advertencia al restaurar la versión base:', e);
       }
 
-      setProgressStep('📁 Creando estructura de carpetas...');
-      const carpetaCreada = await crearEstructuraCarpetas(formData.checksumBase, md5Aumento);
+      // Paralelizar tareas no-dependientes: captura, Release Notes y Roadmap
+      await Promise.all([
+        (async () => {
+          if (carpetaCreada) await capturarPantalla(carpetaCreada);
+        })(),
+        (async () => {
+          if (carpetaCreada) await generarReleaseNotes(carpetaCreada);
+        })(),
+        actualizarRoadmap()
+      ]).catch(err => console.warn('Error en procesamiento paralelo:', err));
 
-      setProgressStep('📸 Capturando pantalla automáticamente...');
-      if (carpetaCreada) {
-        await capturarPantalla(carpetaCreada);
-      }
-
-      setProgressStep('📄 Generando Release Notes...');
-      if (carpetaCreada) {
-        await generarReleaseNotes(carpetaCreada);
-      }
-
-      setProgressStep('🗺️ Actualizando Roadmap...');
-      await actualizarRoadmap();
-
-      const asuntoCorreo = await handleCreateEmail(md5Aumento, historialZipPath || undefined);
+      const asuntoCorreo = await handleCreateEmail(md5Aumento, historialZipPath || undefined, checksumBaseAuto);
 
       setProgressStep('✅ Proceso completado - Correo creado');
       setIsCalculatingChecksums(false);
@@ -1832,10 +2039,48 @@ ${formData.linksOneDrive || 'N/A'}
     }
 
     setShowProgressModal(true);
+    const binFilePath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
+    let versionFilePath = formData.archivoVersion;
+    
+    if (!versionFilePath && window.electronAPI) {
+      const projectRoot = formData.rutaProyecto ? normalizeWindowsSlashes(formData.rutaProyecto) : '';
+      const manualEntry = formData.archivoVersion?.trim();
+      const headerHintPath = artifactHints.headerPath ? normalizeWindowsSlashes(artifactHints.headerPath) : null;
+      versionFilePath = await findVersionFileFast(projectRoot, manualEntry, headerHintPath) || '';
+    }
+    
+    // PRIMERO: Actualizar versión AUMENTO en el archivo (SIEMPRE, no solo si falta .bin)
+    if (versionFilePath && formData.versionAumento) {
+      setProgressStep('📝 Actualizando versión AUMENTO en código...');
+      const updateResult = await updateVersionInFile(versionFilePath, formData.versionAumento);
+      if (!updateResult) {
+        console.warn('⚠️ No se pudo actualizar versión automáticamente.');
+      } else {
+        console.log('✅ Versión AUMENTO actualizada correctamente');
+      }
+    }
+    
+    // LUEGO: Si no existe el .bin, compilar automáticamente
+    if (window.electronAPI?.runCompilation && formData.comandoCompilacion) {
+      const binExists = await window.electronAPI.fileExists(binFilePath);
+      if (!binExists) {
+        console.warn('⚠️ [Manual] .bin no existe. Compilando automáticamente...');
+        setProgressStep('🔨 Compilando versión AUMENTO...');
+        const compilationDir = formData.rutaCompilacion || formData.rutaProyecto || '';
+        const compileResult = await window.electronAPI.runCompilation(formData.comandoCompilacion, compilationDir);
+        if (!compileResult.ok) {
+          console.error('❌ [Manual] Error compilando:', compileResult.error);
+          setShowProgressModal(false);
+          setIsCalculatingChecksums(false);
+          setErrorModal({ show: true, title: 'Error compilando', message: `No se pudo compilar automáticamente.\n\n${compileResult.error}\n\nCompila manualmente e intenta de nuevo.` });
+          return;
+        }
+        console.log('✅ [Manual] Compilado automáticamente correctamente');
+      }
+    }
+    
     setProgressStep('🔐 Calculando checksum AUMENTO...');
     setIsCalculatingChecksums(true);
-    
-    const binFilePath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
     const md5Aumento = await window.electronAPI.computeMd5(binFilePath);
     
     if (!md5Aumento) {
@@ -1848,8 +2093,11 @@ ${formData.linksOneDrive || 'N/A'}
     if (formData.checksumBase === md5Aumento) {
       setShowProgressModal(false);
       setIsCalculatingChecksums(false);
-      setChecksumWarning('');
+      setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
       setCompilationDetected(false);
+      showChecksumIdenticalError();
+      // Pequeño delay para asegurar que el estado se actualice
+      await new Promise(resolve => setTimeout(resolve, 100));
       setErrorModal({
         show: true,
         title: '⚠️ Checksums Idénticos',
@@ -1869,7 +2117,7 @@ ${formData.linksOneDrive || 'N/A'}
     setProgressStep('📁 Creando estructura de carpetas...');
     await crearEstructuraCarpetas(formData.checksumBase, md5Aumento);
     
-    const asuntoCorreo = await handleCreateEmail(md5Aumento, historialInfo.zipPath || undefined);
+    const asuntoCorreo = await handleCreateEmail(md5Aumento, historialInfo.zipPath || undefined, formData.checksumBase);
     
     setProgressStep('✅ Proceso completado');
     setIsCalculatingChecksums(false);
@@ -2608,19 +2856,7 @@ ${formData.linksOneDrive || 'N/A'}
                   <h3 className="text-xl font-bold text-gray-900">Compila la Versión AUMENTO</h3>
                 </div>
 
-                {checksumWarning && (
-                  <div className="mb-6 rounded-lg border border-red-300 bg-white p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="text-red-500 text-lg pt-0.5">⚠️</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-800 mb-1">El binario compilado no cambió</p>
-                        <p className="text-xs text-gray-600 leading-relaxed select-text">
-                          {checksumWarning}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+
 
                 <div className="bg-white rounded-xl p-5 mb-4 border-2 border-gray-200 shadow-sm">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Versión AUMENTO</p>
@@ -2652,7 +2888,7 @@ ${formData.linksOneDrive || 'N/A'}
                     </div>
                     <div className="mt-3 pt-3 border-t border-red-200">
                       <p className="text-xs text-red-700">
-                        💡 <strong>Tip:</strong> Este mensaje desaparecerá automáticamente cuando detectemos una nueva compilación válida.
+                        💡 <strong>Nota:</strong> Este mensaje desaparecerá automáticamente cuando detectemos una nueva compilación válida.
                       </p>
                     </div>
                   </div>

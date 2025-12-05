@@ -22,9 +22,9 @@ export const crearCorreoHtml = (
   const baseChecksum = md5Base || formData.checksumBase || '';
   const aumentoChecksum = md5Aumento || formData.checksumAumento || '';
 
-  let body = '<div style="font-family:Calibri;font-size:12pt;line-height:1.6;">';
+  let body = '<div style="font-family:\"Calibri Light\",Calibri,Arial,sans-serif;font-size:12pt;line-height:1.6;">';
   body += '<p style="margin:0;">Cordial saludo,<br>Espero que te encuentres muy bien. Mediante el presente, realizo la entrega formal de la versión <b>' + versionStr + '_' + (formData.build || '') + '</b> para su respectiva firma.</p>';
-  body += '<p style="margin:12px 0 8px 0;"><b>Detalles:</b></p>';
+  body += '<p style="margin:20px 0 4px 0;"><b>Detalles:</b></p>';
   body += '<ul style="margin:0;padding-left:20px;">';
   
   body += '<li style="margin:4px 0;"><b>VERSI&Oacute;N- ' + baseStr + '</b>';
@@ -37,7 +37,7 @@ export const crearCorreoHtml = (
   body += '</ul></li>';
   
   if (aumentoChecksum) {
-    body += '<li style="margin:4px 0;"><b>VERSI&Oacute;N DE AUMENTO- ' + aumentoStr + '</b>';
+    body += '<li style="margin:20px 0 4px 0;"><b>VERSI&Oacute;N DE AUMENTO- ' + aumentoStr + '</b>';
     body += '<ul style="margin:0;padding-left:20px;list-style-type:circle;">';
     body += '<li style="margin:2px 0;"><b>Terminal:</b> ' + (formData.terminal || '') + '</li>';
     body += '<li style="margin:2px 0;"><b>Tipo de firma:</b> ' + (formData.tipoFirma === 'personalizada' ? 'Personalizada' : 'Gen&eacute;rica') + '</li>';

@@ -61,8 +61,8 @@ const modules: ModuleCard[] = [
   }
 ];
 
-const BentoNavbar = ({ 
-  darkMode, 
+const BentoNavbar = ({
+  darkMode,
   toggleDarkMode,
   notifications,
   unreadCount,
@@ -244,70 +244,67 @@ const BentoNavbar = ({
           <>
             <div
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
             />
-            <div className="fixed top-16 right-0 z-[101] w-screen max-w-none rounded-none sm:right-2 sm:w-[calc(100%-1rem)] sm:rounded-2xl md:right-3 md:w-[calc(100%-1.5rem)] lg:right-4 lg:w-[calc(100%-2rem)] lg:rounded-2xl lg:max-w-6xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-2xl p-6 max-h-[calc(100vh-88px)] overflow-y-auto">
-              <button
-                onClick={() => setIsOpen(false)}
-                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <XMarkIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-              </button>
 
-              <div className="mb-6 pr-12">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Módulos del Sistema
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Selecciona el módulo que deseas utilizar
-                </p>
-              </div>
+            <div className="fixed top-20 left-4 right-4 sm:left-5 sm:right-5 z-[101] rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-2xl p-0 max-h-[calc(100vh-88px)] overflow-y-auto origin-top animate-[menuOpen_0.25s_ease-out]">
+              <div className="p-6 sm:p-8">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Módulos del Sistema
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Selecciona el módulo que deseas utilizar
+                  </p>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {modules.map((module) => {
-                    const isActive = location.pathname === module.href;
-                    const Icon = module.icon;
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {modules.map((module) => {
+                  const isActive = location.pathname === module.href;
+                  const Icon = module.icon;
 
-                    return (
-                      <div key={module.id}>
-                        <Link
-                          to={module.href}
-                          onClick={() => setIsOpen(false)}
+                  return (
+                    <Link
+                      key={module.id}
+                      to={module.href}
+                      onClick={() => setIsOpen(false)}
+                      className={cn(
+                        'block p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer relative group',
+                        'bg-white dark:bg-gray-800',
+                        'hover:shadow-lg hover:scale-[1.02]',
+                        isActive
+                          ? 'border-pink-500 dark:border-pink-400 shadow-lg shadow-pink-500/20 bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-900/20 dark:to-purple-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-pink-400 dark:hover:border-pink-500'
+                      )}
+                    >
+                      {module.badge && (
+                        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold shadow-md">
+                          {module.badge}
+                        </span>
+                      )}
+
+                      <div className="flex flex-col items-center justify-center gap-3 text-center">
+                        <div
                           className={cn(
-                            'block p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer relative group',
-                            'bg-white dark:bg-gray-800',
-                            'hover:shadow-lg hover:scale-[1.02]',
-                            isActive
-                              ? 'border-pink-500 dark:border-pink-400 shadow-lg shadow-pink-500/20 bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-900/20 dark:to-purple-900/20'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-pink-400 dark:hover:border-pink-500'
+                            'w-16 h-16 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform',
+                            module.color
                           )}
                         >
-                          {module.badge && (
-                            <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold shadow-md">
-                              {module.badge}
-                            </span>
-                          )}
-                          
-                          <div className="flex flex-col items-center justify-center gap-3 text-center">
-                            <div className={cn(
-                              'w-16 h-16 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform',
-                              module.color
-                            )}>
-                              <Icon className="w-8 h-8 text-white" />
-                            </div>
-                            
-                            <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                              {module.title}
-                            </h3>
-                            
-                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
-                              {module.description}
-                            </p>
-                          </div>
-                        </Link>
+                          <Icon className="w-8 h-8 text-white" />
+                        </div>
+
+                        <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                          {module.title}
+                        </h3>
+
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                          {module.description}
+                        </p>
                       </div>
-                    );
-                  })}
+                    </Link>
+                  );
+                })}
+              </div>
               </div>
             </div>
           </>
