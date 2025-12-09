@@ -251,9 +251,16 @@ const sanitizePathSegment = (value?: string, preserveDots: boolean = false) => {
 };
 
 const buildHistorialFolderName = (data: CrearVersionData) => {
-  const baseLabel = `${data.nombreVersionCliente || data.cliente || 'VERSION'}_${data.versionBase || 'BASE'}`;
-  const base = sanitizePathSegment(baseLabel, true);
-  return `VERSION_${base}`;
+  const client = data.nombreVersionCliente || data.cliente || 'VERSION';
+  const baseVersion = (data.versionBase || 'BASE').replace(/\./g, '_');
+  const build = data.build || getTodayYYMMDD();
+  const label = `${client}${baseVersion}_${build}`;
+  return sanitizePathSegment(label, true);
+};
+
+const buildBinFolderName = (label?: string, version?: string) => {
+  const base = (version || '').replace(/\./g, '_');
+  return sanitizePathSegment(`${label || ''}${base}`, true) || 'BASE';
 };
 
 
@@ -350,6 +357,7 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
   const historialFolderRef = useRef<string | null>(null);
   const historialZipRef = useRef<string | null>(null);
   const lastMonitoredMd5Ref = useRef<string | null>(null);
+  const baseChecksumRef = useRef<string | null>(null);
   const lastMonitoredMtimeRef = useRef<number | null>(null);
   const checksumErrorShownRef = useRef<boolean>(false);
   const hasDetectedAnyChangeRef = useRef<boolean>(false);
@@ -419,8 +427,10 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     const folderPath = getHistorialFolderPath();
     if (!folderPath) return null;
     await window.electronAPI.createDirectory(folderPath);
-    await window.electronAPI.createDirectory(`${folderPath}\\Nombre Base`);
-    await window.electronAPI.createDirectory(`${folderPath}\\Nombre de Aumento`);
+    const baseFolderName = buildBinFolderName(formData.nombreVersionCliente || formData.cliente, formData.versionBase || 'BASE');
+    const aumentoFolderName = buildBinFolderName(formData.nombreVersionCliente || formData.cliente, formData.versionAumento || 'AUMENTO');
+    await window.electronAPI.createDirectory(`${folderPath}\\${baseFolderName}`);
+    await window.electronAPI.createDirectory(`${folderPath}\\${aumentoFolderName}`);
     historialFolderRef.current = folderPath;
     setLastHistorialPath(folderPath);
     return folderPath;
@@ -434,14 +444,20 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     aumentoFolderName?: string
   ) => {
     if (!window.electronAPI || !folderPath) return;
-    // Usar nombres legibles: "Nombre Base" y "Nombre de Aumento"
-    const baseName = baseFolderName ? `Nombre Base (${baseFolderName})` : 'Nombre Base';
-    const aumentoName = aumentoFolderName ? `Nombre de Aumento (${aumentoFolderName})` : 'Nombre de Aumento';
-    const checksumBaseLine = `${baseName}: ${md5Base || 'PENDIENTE'}`;
-    const checksumAumentoLine = `${aumentoName}: ${md5Aumento || 'PENDIENTE'}`;
-    const checksumsContent = md5Aumento
-      ? `${checksumBaseLine}\n${checksumAumentoLine}\n`
-      : `${checksumBaseLine}\n`;
+    const baseName = baseFolderName || 'BASE';
+    const aumentoName = aumentoFolderName || 'AUMENTO';
+
+    const lines: string[] = [];
+    lines.push(`${baseName}`);
+    lines.push(`Checksum (MD5): ${md5Base || 'PENDIENTE'}`);
+
+    if (md5Aumento) {
+      lines.push('');
+      lines.push(`${aumentoName}`);
+      lines.push(`Checksum (MD5): ${md5Aumento || 'PENDIENTE'}`);
+    }
+
+    const checksumsContent = `${lines.join('\n')}\n`;
     await window.electronAPI.writeTextFile(
       `${folderPath}\\Checksums.txt`,
       checksumsContent
@@ -489,10 +505,8 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       if (!exists) return;
       const folderPath = historialFolderRef.current || await ensureHistorialFolder();
       if (!folderPath) return;
-      // Usar nombre dinámico: nombreVersionCliente + versionBase con formato "Nombre Base"
-      const baseFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionBase}`;
-      const baseDisplayName = `Nombre Base`;
-      const copyResult = await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${baseDisplayName}\\${formData.nombreArchivoBin}`);
+      const baseFolderName = buildBinFolderName(formData.nombreVersionCliente || formData.cliente, formData.versionBase);
+      const copyResult = await window.electronAPI.copyFile(sourceBinPath, `${folderPath}\\${baseFolderName}\\${formData.nombreArchivoBin}`);
       if (!copyResult?.ok) {
         console.warn('⚠️ Error guardando binario BASE:', copyResult?.error);
       } else {
@@ -521,11 +535,10 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     }
     const sourceBinPath = `${formData.rutaCompilacion}\\${formData.nombreArchivoBin}`;
     
-    // Nombres dinámicos de carpetas - usar "Nombre Base" y "Nombre de Aumento"
-    const baseFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionBase}`;
-    const aumentoFolderName = `${formData.nombreVersionCliente || formData.cliente}${formData.versionAumento}`;
-    const baseDisplayName = 'Nombre Base';
-    const aumentoDisplayName = 'Nombre de Aumento';
+    const baseFolderName = buildBinFolderName(formData.nombreVersionCliente || formData.cliente, formData.versionBase);
+    const aumentoFolderName = buildBinFolderName(formData.nombreVersionCliente || formData.cliente, formData.versionAumento);
+    const baseDisplayName = baseFolderName;
+    const aumentoDisplayName = aumentoFolderName;
 
     try {
       console.log('✅ Folder path:', folderPath);
@@ -579,7 +592,9 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       if (!folderPath) return null;
       const baseValue = md5Base ?? formData.checksumBase ?? undefined;
       const aumentoValue = md5Aumento ?? formData.checksumAumento ?? undefined;
-      await actualizarChecksumsFile(folderPath, baseValue, aumentoValue);
+      const baseFolderName = buildBinFolderName(formData.nombreVersionCliente || formData.cliente, formData.versionBase);
+      const aumentoFolderName = buildBinFolderName(formData.nombreVersionCliente || formData.cliente, formData.versionAumento);
+      await actualizarChecksumsFile(folderPath, baseValue, aumentoValue, baseFolderName, aumentoFolderName);
       setLastHistorialPath(folderPath);
       setFormData(prev => prev.linksOneDrive === folderPath ? prev : ({ ...prev, linksOneDrive: folderPath }));
       return folderPath;
@@ -618,9 +633,10 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
     const hasCompilePy = names.some(n => n === 'compile.py');
     const hasMakefile = names.some(n => n === 'makefile');
     const binCandidates = Array.from(new Set(names.filter(n => n.endsWith('.bin'))));
+    const hasUserClearedCommand = userClearedCommandRef.current;
     setFormData(prev => {
       const next = { ...prev };
-      if (!prev.comandoCompilacion) {
+      if (!prev.comandoCompilacion && !hasUserClearedCommand) {
         next.comandoCompilacion = hasCompilePy ? 'py compile.py' : (hasMakefile ? 'make' : prev.comandoCompilacion);
       }
       if (!prev.nombreArchivoBin && binCandidates.length > 0) {
@@ -692,39 +708,36 @@ export default function CrearVersionModal({ isOpen, onClose, onSubmit }: CrearVe
       }
       
       try {
-        const commandToSave = newData.comandoCompilacion?.trim() || undefined;
+        const commandToSave = newData.comandoCompilacion?.trim() || '';
         const preferencesToSave = {
-          cliente: newData.cliente,
-          terminal: newData.terminal,
-          responsable: newData.responsable,
-          tipoFirma: newData.tipoFirma,
-          cid: newData.cid,
-          rutaCompilacion: newData.rutaCompilacion,
-          rutaLocal: newData.rutaLocal,
-          tipoDocumento: newData.tipoDocumento,
-          versionBase: newData.versionBase,
-          versionAumento: newData.versionAumento,
-          descripcionBreve: newData.descripcionBreve,
-          departamento: newData.departamento,
-          notasTecnicas: newData.notasTecnicas,
-          nombrePkgBase: newData.nombrePkgBase,
-              // Guardar también estos campos que antes no se persistían
-          nombreVersionCliente: newData.nombreVersionCliente,
-          nombreArchivoBin: newData.nombreArchivoBin,
-          linksOneDrive: newData.linksOneDrive,
-          // Campos de compilación automática
-          rutaProyecto: newData.rutaProyecto,
-          archivoVersion: newData.archivoVersion,
+          cliente: newData.cliente || '',
+          terminal: newData.terminal || '',
+          responsable: newData.responsable || '',
+          tipoFirma: newData.tipoFirma || '',
+          cid: newData.cid || '',
+          rutaCompilacion: newData.rutaCompilacion || '',
+          rutaLocal: newData.rutaLocal || '',
+          tipoDocumento: newData.tipoDocumento || '',
+          versionBase: newData.versionBase || '',
+          versionAumento: newData.versionAumento || '',
+          descripcionBreve: newData.descripcionBreve || '',
+          departamento: newData.departamento || '',
+          notasTecnicas: newData.notasTecnicas || '',
+          nombrePkgBase: newData.nombrePkgBase || '',
+          nombreVersionCliente: newData.nombreVersionCliente || '',
+          nombreArchivoBin: newData.nombreArchivoBin || '',
+          linksOneDrive: newData.linksOneDrive || '',
+          rutaProyecto: newData.rutaProyecto || '',
+          archivoVersion: newData.archivoVersion || '',
           comandoCompilacion: commandToSave,
-          compilePyMode: newData.compilePyMode,
-          compilePyTarget: newData.compilePyTarget,
+          compilePyMode: newData.compilePyMode || '',
+          compilePyTarget: newData.compilePyTarget || '',
           incluirVersionAumento: newData.incluirVersionAumento,
+          comandoCleared: userClearedCommandRef.current,
         };
-        // No guardar comando vacío; si el usuario lo limpió, evitamos reinyectarlo
-        if (!commandToSave) {
-          delete preferencesToSave.comandoCompilacion;
-        }
+        
         localStorage.setItem('versiones-app:preferencias-formulario', JSON.stringify(preferencesToSave));
+        console.log('[handleInputChange] Preferencias guardadas en localStorage');
       } catch (error) {
         console.error('Error guardando preferencias:', error);
       }
@@ -1236,6 +1249,7 @@ ${formData.linksOneDrive || 'N/A'}
     
     // Usar el checksum pasado como parámetro o el del estado
     const checksumBaseToUse = baseChecksumOverride || formData.checksumBase;
+    baseChecksumRef.current = checksumBaseToUse || null;
 
     if (checkFileIntervalRef.current) {
       clearInterval(checkFileIntervalRef.current);
@@ -1245,6 +1259,10 @@ ${formData.linksOneDrive || 'N/A'}
     setChecksumWarning('');
     checksumErrorShownRef.current = false;
     hasDetectedAnyChangeRef.current = false; // Resetear bandera de cambios
+    lastMonitoredMd5Ref.current = null; // Se inicializa con el MD5 actual más abajo
+    lastMonitoredMtimeRef.current = null; // Limpiar mtime anterior
+    // Refrescar el checksum base desde el formulario para cada ejecución manual
+    baseChecksumRef.current = (formData.checksumBase || '').trim() || null;
 
     (async () => {
       try {
@@ -1256,14 +1274,18 @@ ${formData.linksOneDrive || 'N/A'}
       try {
         // Capturar MD5 actual del bin monitoreado
         const md5Initial = await window.electronAPI.computeMd5(binFilePath);
-        lastMonitoredMd5Ref.current = md5Initial;
-        // Si no existe checksum BASE aún, usar el MD5 actual como referencia BASE
-        if (!checksumBaseToUse && md5Initial) {
-          setFormData(prev => ({ ...prev, checksumBase: md5Initial! }));
+        if (md5Initial) {
+          lastMonitoredMd5Ref.current = md5Initial; // Punto de partida para detectar cambios posteriores
         }
-        console.log(`🎯 Monitoreo iniciado - BASE esperado: ${checksumBaseToUse?.substring(0, 12) || 'ninguno'}`);
+
+        if (!baseChecksumRef.current && md5Initial) {
+          baseChecksumRef.current = md5Initial;
+          setFormData(prev => ({ ...prev, checksumBase: md5Initial }));
+        }
+        console.log(`🎯 Monitoreo iniciado - BASE esperado: ${baseChecksumRef.current?.substring(0, 12) || 'ninguno'}`);
+        console.log(`🎯 MD5 actual del archivo: ${md5Initial?.substring(0, 12) || 'ninguno'}`);
       } catch {
-        lastMonitoredMd5Ref.current = null;
+        // No hacer nada - el interval lo manejará
       }
     })();
 
@@ -1273,6 +1295,7 @@ ${formData.linksOneDrive || 'N/A'}
         const mtime = stat?.ok ? (stat.mtimeMs ?? null) : null;
         const md5Current = await window.electronAPI.computeMd5(binFilePath);
         if (!md5Current) return;
+        const baseChecksumCurrent = baseChecksumRef.current;
 
         const mtimeChanged = Boolean(
           typeof mtime === 'number' && typeof lastMonitoredMtimeRef.current === 'number' && mtime !== lastMonitoredMtimeRef.current
@@ -1284,49 +1307,50 @@ ${formData.linksOneDrive || 'N/A'}
           md5Changed,
           md5Current: md5Current.substring(0, 12),
           md5Last: lastMonitoredMd5Ref.current?.substring(0, 12),
-          checksumBase: checksumBaseToUse?.substring(0, 12),
-          sonIguales: md5Current === checksumBaseToUse,
+          checksumBase: baseChecksumCurrent?.substring(0, 12),
+          sonIguales: baseChecksumCurrent ? md5Current === baseChecksumCurrent : false,
           archivo: binFilePath
         });
 
-        // Si detectamos cambio en el archivo (por mtime o MD5)
-        if (mtimeChanged || md5Changed) {
-          hasDetectedAnyChangeRef.current = true; // Marcar que hubo al menos un cambio
-          console.log('🔔 Cambio detectado en el archivo - Nueva compilación detectada');
+        // Detectar cambio en progreso (compilando): MD5 cambió desde el último tick
+        if (md5Changed) {
+          hasDetectedAnyChangeRef.current = true;
+          console.log('🔔 CAMBIO REAL DETECTADO - Nueva compilación confirmada');
           console.log(`   MD5 anterior: ${lastMonitoredMd5Ref.current?.substring(0, 12)}`);
           console.log(`   MD5 actual: ${md5Current.substring(0, 12)}`);
-          console.log(`   MD5 BASE esperado: ${checksumBaseToUse?.substring(0, 12)}`);
+          console.log(`   MD5 BASE esperado: ${baseChecksumCurrent?.substring(0, 12)}`);
 
-          // Al detectar cambio, ocultar cualquier mensaje previo mientras compila
           if (checksumErrorShownRef.current || checksumWarning) {
-            console.log('🔄 Nueva compilación detectada - ocultando mensajes previos');
+            console.log('🔄 Nueva compilación real detectada - ocultando mensajes previos');
             setChecksumWarning('');
           }
           checksumErrorShownRef.current = false;
           setCompilationDetected(false);
 
-          // Actualizar refs y esperar siguiente tick para evaluar checksums
           lastMonitoredMtimeRef.current = mtime;
           lastMonitoredMd5Ref.current = md5Current;
           return;
         }
 
-        // Evaluar estado cuando no hay cambios adicionales (archivo estabilizado)
-        if (hasDetectedAnyChangeRef.current && checksumBaseToUse) {
-          if (md5Current === checksumBaseToUse && !checksumErrorShownRef.current) {
-            console.log('❌ CHECKSUMS IDÉNTICOS - Archivo estabilizado con el mismo MD5');
-            setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
-            setCompilationDetected(false);
-            checksumErrorShownRef.current = true;
-          } else if (md5Current !== checksumBaseToUse && !compilationDetected) {
-            console.log('✅ MD5 diferente al BASE tras cambio - compilación válida');
-            setChecksumWarning('');
-            checksumErrorShownRef.current = false;
-            setCompilationDetected(true);
-            // Si queremos detener el monitoreo tras éxito, descomentar:
-            if (checkFileIntervalRef.current) {
-              clearInterval(checkFileIntervalRef.current);
-              checkFileIntervalRef.current = null;
+        if (baseChecksumCurrent) {
+          if (md5Current === baseChecksumCurrent) {
+            if (hasDetectedAnyChangeRef.current && !checksumErrorShownRef.current) {
+              console.log('❌ CHECKSUMS IDÉNTICOS - MD5 actual igual al BASE tras compilación');
+              setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
+              setCompilationDetected(false);
+              checksumErrorShownRef.current = true;
+            }
+          } else {
+            if (hasDetectedAnyChangeRef.current && !compilationDetected) {
+              console.log('✅ MD5 diferente al BASE - compilación válida detectada');
+              console.log(`   BASE: ${baseChecksumCurrent.substring(0, 12)}, Actual: ${md5Current.substring(0, 12)}`);
+              setChecksumWarning('');
+              checksumErrorShownRef.current = false;
+              setCompilationDetected(true);
+              if (checkFileIntervalRef.current) {
+                clearInterval(checkFileIntervalRef.current);
+                checkFileIntervalRef.current = null;
+              }
             }
           }
         }
@@ -1492,7 +1516,7 @@ ${formData.linksOneDrive || 'N/A'}
       } finally {
         detectTargetsTimeoutRef.current = null;
       }
-    }, 250); // Optimizado: detección más rápida de scripts/binarios
+    }, 250);
 
     return () => {
       cancelled = true;
@@ -1502,6 +1526,18 @@ ${formData.linksOneDrive || 'N/A'}
 
   useEffect(() => {
     if (isOpen) {
+      try {
+        const savedRaw = localStorage.getItem('versiones-app:preferencias-formulario');
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          userClearedCommandRef.current = Boolean(saved?.comandoCleared);
+          if (saved?.comandoCleared) {
+            setFormData(prev => ({ ...prev, comandoCompilacion: '' }));
+          }
+        }
+      } catch {
+        userClearedCommandRef.current = false;
+      }
       const today = getTodayYYMMDD();
       console.log('Fecha generada para build:', today);
       setFormData(prev => ({ ...prev, build: today }));
@@ -1524,6 +1560,12 @@ ${formData.linksOneDrive || 'N/A'}
       }
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      console.log('Modal cerrado - Limpiando notificaciones...');
+    }
   }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1622,16 +1664,12 @@ ${formData.linksOneDrive || 'N/A'}
             
             if (!md5Base) {
               md5Base = formData.checksumBase || null;
+              // En modo manual, si no existe .bin ni tenemos checksum, no bloqueamos
+              // El usuario compilará manualmente y presionará Finalizar nuevamente
               if (!md5Base) {
-                setShowProgressModal(false);
-                setIsCalculatingChecksums(false);
-                isSubmittingRef.current = false;
-                setErrorModal({
-                  show: true,
-                  title: 'Falta archivo .bin o checksum',
-                  message: 'El .bin no existe. Compila y presiona Finalizar de nuevo.'
-                });
-                return;
+                console.warn('⚠️ .bin no existe y no hay checksum previo. Usuario debe compilar manualmente.');
+                // No bloqueamos: continuamos sin checksum BASE inicial
+                // El flujo se verá completado pero sin .bin BASE
               }
             }
           } else {
@@ -1651,7 +1689,7 @@ ${formData.linksOneDrive || 'N/A'}
         }
         
         setFormData(prev => ({ ...prev, checksumBase: md5Base! }));
-        if (window.electronAPI) {
+        if (window.electronAPI && md5Base) {
           await snapshotBaseBinary(binFilePath, md5Base);
         }
 
@@ -1663,7 +1701,7 @@ ${formData.linksOneDrive || 'N/A'}
           isSubmittingRef.current = false;
           return;
         } else {
-          await handleAumentoYes(md5Base);
+          await handleAumentoYes(md5Base || undefined);
           isSubmittingRef.current = false;
           return;
         }
@@ -1776,31 +1814,47 @@ ${formData.linksOneDrive || 'N/A'}
       } catch {}
 
       setProgressStep('⚙️ Procesando versión BASE...');
-      console.log('🔨 Recompilando BASE con comando:', formData.comandoCompilacion);
-      const baseCompileResult = await window.electronAPI.runCompilation(
-        formData.comandoCompilacion!,
-        compilationDir,
-        stdinData
-      );
-
-      if (!baseCompileResult.ok) {
-        setShowProgressModal(false);
-        setIsCalculatingChecksums(false);
-        setErrorModal({
-          show: true,
-          title: 'Error compilando BASE',
-          message: baseCompileResult.error || 'La compilación de la versión BASE falló. Revisa logs en la consola.'
-        });
-        return;
+      console.log('🔨 Compilando BASE con comando:', formData.comandoCompilacion);
+      
+      // Verificar si el binario BASE ya existe y tiene checksum válido
+      let shouldRecompileBase = true;
+      const existingBinChecksum = await window.electronAPI.computeMd5(binFilePath);
+      
+      if (existingBinChecksum && formData.checksumBase === existingBinChecksum) {
+        console.log('✅ Binario BASE ya existe con checksum válido. No es necesario recompilar.');
+        shouldRecompileBase = false;
+        checksumBaseAuto = existingBinChecksum;
+      } else {
+        console.log('Compilando BASE porque: binario no existe o checksum diferente');
       }
+      
+      if (shouldRecompileBase) {
+        const baseCompileResult = await window.electronAPI.runCompilation(
+          formData.comandoCompilacion!,
+          compilationDir,
+          stdinData
+        );
 
-      checksumBaseAuto = await window.electronAPI.computeMd5(binFilePath) || '';
-      if (!checksumBaseAuto) {
-        setShowProgressModal(false);
-        setIsCalculatingChecksums(false);
-        setErrorModal({ show: true, title: 'Checksum BASE inválido', message: 'No se pudo leer el binario recompilado para la versión BASE.' });
-        return;
+        if (!baseCompileResult.ok) {
+          setShowProgressModal(false);
+          setIsCalculatingChecksums(false);
+          setErrorModal({
+            show: true,
+            title: 'Error compilando BASE',
+            message: baseCompileResult.error || 'La compilación de la versión BASE falló. Revisa logs en la consola.'
+          });
+          return;
+        }
+
+        checksumBaseAuto = await window.electronAPI.computeMd5(binFilePath) || '';
+        if (!checksumBaseAuto) {
+          setShowProgressModal(false);
+          setIsCalculatingChecksums(false);
+          setErrorModal({ show: true, title: 'Checksum BASE inválido', message: 'No se pudo leer el binario recompilado para la versión BASE.' });
+          return;
+        }
       }
+      
       setFormData(prev => ({ ...prev, checksumBase: checksumBaseAuto }));
       await snapshotBaseBinary(binFilePath, checksumBaseAuto);
 
@@ -1914,14 +1968,14 @@ ${formData.linksOneDrive || 'N/A'}
       setFormData(prev => ({ ...prev, checksumAumento: md5Aumento }));
 
       // Paralelizar: historial ZIP + restauración versión + creación carpetas
-      setProgressStep('📦 Procesando historial, archivos y carpetas...');
+      setProgressStep('📦 Procesando archivos y carpetas (auto)...');
       
       // Ejecutar en paralelo operaciones independientes
       const [historialInfo, carpetaCreada] = await Promise.all([
         // Registrar en historial y generar ZIP
         (async () => {
           const info = await registrarAumentoEnHistorial(checksumBaseAuto, md5Aumento);
-          return info.zipPath || historialZipRef.current;
+          return info?.zipPath || historialZipRef.current;
         })(),
         // Restaurar versión BASE
         (async () => {
@@ -1981,11 +2035,26 @@ ${formData.linksOneDrive || 'N/A'}
         actualizarRoadmap()
       ]).catch(err => console.warn('Error en procesamiento paralelo:', err));
 
-      const asuntoCorreo = await handleCreateEmail(md5Aumento, historialZipPath || undefined, checksumBaseAuto);
+      let zipPathToUse = historialZipPath || undefined;
+      if (zipPathToUse && window.electronAPI?.fileExists) {
+        const zipExists = await window.electronAPI.fileExists(zipPathToUse);
+        if (!zipExists) {
+          console.warn('⚠️ ZIP no existe en primera verificación. Reintentando en 1s...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const zipExistsRetry = await window.electronAPI.fileExists(zipPathToUse);
+          if (!zipExistsRetry) {
+            console.error('❌ ZIP definitivamente no existe. Enviando correo sin adjunto.');
+            zipPathToUse = undefined;
+          }
+        }
+      }
+
+      const asuntoCorreo = await handleCreateEmail(md5Aumento, zipPathToUse, checksumBaseAuto);
 
       setProgressStep('✅ Proceso completado - Correo creado');
       setIsCalculatingChecksums(false);
       setShowProgressModal(false);
+      setCompilationDetected(true);
       
       const dataFinal: CrearVersionData = {
         ...formData,
@@ -2032,9 +2101,22 @@ ${formData.linksOneDrive || 'N/A'}
 
   const handleAumentoDone = async () => {
     setWaitingForAumentoCompile(false);
+    const isManualFinalize = waitingForAumentoCompile && !(formData.rutaProyecto && formData.archivoVersion && formData.comandoCompilacion);
     
     if (!formData.rutaCompilacion || !formData.nombreArchivoBin) {
       setErrorModal({ show: true, title: '❌ Faltan datos', message: 'Debes proporcionar la ruta de compilación y el nombre del archivo .bin' });
+      return;
+    }
+
+    // Validar que la versión AUMENTO sea diferente de BASE
+    if (formData.versionAumento === formData.versionBase) {
+      setShowProgressModal(false);
+      setIsCalculatingChecksums(false);
+      setErrorModal({
+        show: true,
+        title: '⚠️ ADVERTENCIA: Versión no cambió',
+        message: `Las versiones BASE y AUMENTO son iguales: ${formData.versionBase}\n\nEsto causará errores. Debes cambiar la versión AUMENTO a un valor diferente antes de compilar.\n\nEjemplo: BASE=2.0.0 → AUMENTO=2.1.0`
+      });
       return;
     }
 
@@ -2049,34 +2131,39 @@ ${formData.linksOneDrive || 'N/A'}
       versionFilePath = await findVersionFileFast(projectRoot, manualEntry, headerHintPath) || '';
     }
     
-    // PRIMERO: Actualizar versión AUMENTO en el archivo (SIEMPRE, no solo si falta .bin)
-    if (versionFilePath && formData.versionAumento) {
-      setProgressStep('📝 Actualizando versión AUMENTO en código...');
-      const updateResult = await updateVersionInFile(versionFilePath, formData.versionAumento);
-      if (!updateResult) {
-        console.warn('⚠️ No se pudo actualizar versión automáticamente.');
-      } else {
-        console.log('✅ Versión AUMENTO actualizada correctamente');
-      }
-    }
-    
-    // LUEGO: Si no existe el .bin, compilar automáticamente
-    if (window.electronAPI?.runCompilation && formData.comandoCompilacion) {
-      const binExists = await window.electronAPI.fileExists(binFilePath);
-      if (!binExists) {
-        console.warn('⚠️ [Manual] .bin no existe. Compilando automáticamente...');
-        setProgressStep('🔨 Compilando versión AUMENTO...');
-        const compilationDir = formData.rutaCompilacion || formData.rutaProyecto || '';
-        const compileResult = await window.electronAPI.runCompilation(formData.comandoCompilacion, compilationDir);
-        if (!compileResult.ok) {
-          console.error('❌ [Manual] Error compilando:', compileResult.error);
-          setShowProgressModal(false);
-          setIsCalculatingChecksums(false);
-          setErrorModal({ show: true, title: 'Error compilando', message: `No se pudo compilar automáticamente.\n\n${compileResult.error}\n\nCompila manualmente e intenta de nuevo.` });
-          return;
+    // En flujo manual no tocar el archivo de versión ni compilar automáticamente
+    if (!isManualFinalize) {
+      // PRIMERO: Actualizar versión AUMENTO en el archivo
+      if (versionFilePath && formData.versionAumento) {
+        setProgressStep('📝 Actualizando versión AUMENTO en código...');
+        const updateResult = await updateVersionInFile(versionFilePath, formData.versionAumento);
+        if (!updateResult) {
+          console.warn('⚠️ No se pudo actualizar versión automáticamente.');
+        } else {
+          console.log('✅ Versión AUMENTO actualizada correctamente');
         }
-        console.log('✅ [Manual] Compilado automáticamente correctamente');
       }
+      
+      // LUEGO: Si no existe el .bin, compilar automáticamente
+      if (window.electronAPI?.runCompilation && formData.comandoCompilacion) {
+        const binExists = await window.electronAPI.fileExists(binFilePath);
+        if (!binExists) {
+          console.warn('⚠️ [Manual] .bin no existe. Compilando automáticamente...');
+          setProgressStep('🔨 Compilando versión AUMENTO...');
+          const compilationDir = formData.rutaCompilacion || formData.rutaProyecto || '';
+          const compileResult = await window.electronAPI.runCompilation(formData.comandoCompilacion, compilationDir);
+          if (!compileResult.ok) {
+            console.error('❌ [Manual] Error compilando:', compileResult.error);
+            setShowProgressModal(false);
+            setIsCalculatingChecksums(false);
+            setErrorModal({ show: true, title: 'Error compilando', message: `No se pudo compilar automáticamente.\n\n${compileResult.error}\n\nCompila manualmente e intenta de nuevo.` });
+            return;
+          }
+          console.log('✅ [Manual] Compilado automáticamente correctamente');
+        }
+      }
+    } else {
+      console.log('🔒 Flujo manual: no se modifica archivo de versión ni se compila automáticamente');
     }
     
     setProgressStep('🔐 Calculando checksum AUMENTO...');
@@ -2090,13 +2177,18 @@ ${formData.linksOneDrive || 'N/A'}
       return;
     }
 
+    console.log('🔍 Verificando checksums:', {
+      checksumBase: formData.checksumBase?.substring(0, 12),
+      md5Aumento: md5Aumento.substring(0, 12),
+      sonIguales: formData.checksumBase === md5Aumento
+    });
+
     if (formData.checksumBase === md5Aumento) {
       setShowProgressModal(false);
       setIsCalculatingChecksums(false);
       setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
       setCompilationDetected(false);
       showChecksumIdenticalError();
-      // Pequeño delay para asegurar que el estado se actualice
       await new Promise(resolve => setTimeout(resolve, 100));
       setErrorModal({
         show: true,
@@ -2111,15 +2203,28 @@ ${formData.linksOneDrive || 'N/A'}
 
     console.log('✅ MD5 AUMENTO:', md5Aumento);
     setFormData(prev => ({ ...prev, checksumAumento: md5Aumento }));
-    setProgressStep('📦 Actualizando historial y ZIP...');
-    const historialInfo = await registrarAumentoEnHistorial(formData.checksumBase, md5Aumento);
+    setProgressStep('📦 Actualizando historial y ZIP (manual)...');
+    let historialInfo = await registrarAumentoEnHistorial(formData.checksumBase, md5Aumento);
 
-    setProgressStep('📁 Creando estructura de carpetas...');
+    // Verificar que el ZIP exista antes de crear el correo (similar al flujo automático)
+    if (historialInfo.zipPath && window.electronAPI?.fileExists) {
+      const zipExists = await window.electronAPI.fileExists(historialInfo.zipPath);
+      if (!zipExists) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const zipExistsRetry = await window.electronAPI.fileExists(historialInfo.zipPath);
+        if (!zipExistsRetry) {
+          console.warn('⚠️ ZIP no disponible para adjuntar. Se enviará sin adjunto.');
+          historialInfo = { ...historialInfo, zipPath: null };
+        }
+      }
+    }
+
+    setProgressStep('📁 Creando estructura de carpetas (manual)...');
     await crearEstructuraCarpetas(formData.checksumBase, md5Aumento);
     
     const asuntoCorreo = await handleCreateEmail(md5Aumento, historialInfo.zipPath || undefined, formData.checksumBase);
     
-    setProgressStep('✅ Proceso completado');
+    setProgressStep('✅ Proceso completado (manual)');
     setIsCalculatingChecksums(false);
     setShowProgressModal(false);
     
@@ -2859,8 +2964,8 @@ ${formData.linksOneDrive || 'N/A'}
 
 
                 <div className="bg-white rounded-xl p-5 mb-4 border-2 border-gray-200 shadow-sm">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Versión AUMENTO</p>
-                  <p className="text-3xl font-bold text-gray-900">{formData.versionAumento}</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Versión BASE</p>
+                  <p className="text-3xl font-bold text-gray-900">{formData.versionBase}</p>
                 </div>
 
                 {formData.checksumBase && (

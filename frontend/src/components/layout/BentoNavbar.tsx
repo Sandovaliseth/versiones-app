@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -74,6 +74,13 @@ const BentoNavbar = ({
   const location = useLocation();
 
   // Las notificaciones se sincronizan autom├íticamente desde los toasts usando useToastWithHistory
+
+  useEffect(() => {
+    // Cerrar panel de notificaciones cuando se abre el menú de módulos o cuando cambia de ruta
+    if (isOpen || location.pathname) {
+      setIsNotificationsOpen(false);
+    }
+  }, [isOpen, location.pathname]);
 
   return (
     <>
