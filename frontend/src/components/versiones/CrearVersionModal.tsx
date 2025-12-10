@@ -1307,18 +1307,12 @@ ${formData.linksOneDrive || 'N/A'}
           archivo: binFilePath
         });
 
-        // Detectar cambio en progreso (compilando): MD5 cambió desde el último tick
-        const esPrimerTick = lastMonitoredMd5Ref.current === null;
-        if (md5Changed || esPrimerTick) {
+        if (md5Changed) {
           hasDetectedAnyChangeRef.current = true;
-          if (md5Changed) {
-            console.log('🔔 CAMBIO REAL DETECTADO - Nueva compilación confirmada');
-            console.log(`   MD5 anterior: ${lastMonitoredMd5Ref.current?.substring(0, 12)}`);
-            console.log(`   MD5 actual: ${md5Current.substring(0, 12)}`);
-            console.log(`   MD5 BASE esperado: ${baseChecksumCurrent?.substring(0, 12)}`);
-          } else {
-            console.log('🔍 Primer tick del monitoreo - evaluando estado actual del archivo');
-          }
+          console.log('🔔 CAMBIO REAL DETECTADO - Nueva compilación confirmada');
+          console.log(`   MD5 anterior: ${lastMonitoredMd5Ref.current?.substring(0, 12)}`);
+          console.log(`   MD5 actual: ${md5Current.substring(0, 12)}`);
+          console.log(`   MD5 BASE esperado: ${baseChecksumCurrent?.substring(0, 12)}`);
 
           if (checksumErrorShownRef.current || checksumWarning) {
             console.log('🔄 Nueva compilación detectada - reseteando mensajes previos');
@@ -1326,9 +1320,6 @@ ${formData.linksOneDrive || 'N/A'}
           }
           checksumErrorShownRef.current = false;
           setCompilationDetected(false);
-
-          lastMonitoredMtimeRef.current = mtime;
-          lastMonitoredMd5Ref.current = md5Current;
         }
 
         if (baseChecksumCurrent && hasDetectedAnyChangeRef.current) {
