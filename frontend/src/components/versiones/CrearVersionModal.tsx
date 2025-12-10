@@ -1313,15 +1313,20 @@ ${formData.linksOneDrive || 'N/A'}
         });
 
         // Detectar cambio en progreso (compilando): MD5 cambió desde el último tick
-        if (md5Changed) {
+        const esPrimerTick = lastMonitoredMd5Ref.current === null;
+        if (md5Changed || esPrimerTick) {
           hasDetectedAnyChangeRef.current = true;
-          console.log('🔔 CAMBIO REAL DETECTADO - Nueva compilación confirmada');
-          console.log(`   MD5 anterior: ${lastMonitoredMd5Ref.current?.substring(0, 12)}`);
-          console.log(`   MD5 actual: ${md5Current.substring(0, 12)}`);
-          console.log(`   MD5 BASE esperado: ${baseChecksumCurrent?.substring(0, 12)}`);
+          if (md5Changed) {
+            console.log('🔔 CAMBIO REAL DETECTADO - Nueva compilación confirmada');
+            console.log(`   MD5 anterior: ${lastMonitoredMd5Ref.current?.substring(0, 12)}`);
+            console.log(`   MD5 actual: ${md5Current.substring(0, 12)}`);
+            console.log(`   MD5 BASE esperado: ${baseChecksumCurrent?.substring(0, 12)}`);
+          } else {
+            console.log('🔍 Primer tick del monitoreo - evaluando estado actual del archivo');
+          }
 
           if (checksumErrorShownRef.current || checksumWarning) {
-            console.log('🔄 Nueva compilación real detectada - ocultando mensajes previos');
+            console.log('🔄 Nueva compilación detectada - reseteando mensajes previos');
             setChecksumWarning('');
           }
           checksumErrorShownRef.current = false;
@@ -1329,19 +1334,18 @@ ${formData.linksOneDrive || 'N/A'}
 
           lastMonitoredMtimeRef.current = mtime;
           lastMonitoredMd5Ref.current = md5Current;
-          return;
         }
 
-        if (baseChecksumCurrent) {
+        if (baseChecksumCurrent && hasDetectedAnyChangeRef.current) {
           if (md5Current === baseChecksumCurrent) {
-            if (hasDetectedAnyChangeRef.current && !checksumErrorShownRef.current) {
-              console.log('❌ CHECKSUMS IDÉNTICOS - MD5 actual igual al BASE tras compilación');
+            if (!checksumErrorShownRef.current) {
+              console.log('❌ CHECKSUMS IDÉNTICOS - MD5 actual igual al BASE');
               setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
               setCompilationDetected(false);
               checksumErrorShownRef.current = true;
             }
           } else {
-            if (hasDetectedAnyChangeRef.current && !compilationDetected) {
+            if (!compilationDetected) {
               console.log('✅ MD5 diferente al BASE - compilación válida detectada');
               console.log(`   BASE: ${baseChecksumCurrent.substring(0, 12)}, Actual: ${md5Current.substring(0, 12)}`);
               setChecksumWarning('');
