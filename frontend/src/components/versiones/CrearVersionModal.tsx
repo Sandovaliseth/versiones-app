@@ -1272,11 +1272,7 @@ ${formData.linksOneDrive || 'N/A'}
         lastMonitoredMtimeRef.current = null;
       }
       try {
-        // Capturar MD5 actual del bin monitoreado
         const md5Initial = await window.electronAPI.computeMd5(binFilePath);
-        if (md5Initial) {
-          lastMonitoredMd5Ref.current = md5Initial; // Punto de partida para detectar cambios posteriores
-        }
 
         if (!baseChecksumRef.current && md5Initial) {
           baseChecksumRef.current = md5Initial;
@@ -1285,7 +1281,6 @@ ${formData.linksOneDrive || 'N/A'}
         console.log(`🎯 Monitoreo iniciado - BASE esperado: ${baseChecksumRef.current?.substring(0, 12) || 'ninguno'}`);
         console.log(`🎯 MD5 actual del archivo: ${md5Initial?.substring(0, 12) || 'ninguno'}`);
       } catch {
-        // No hacer nada - el interval lo manejará
       }
     })();
 
