@@ -1307,32 +1307,37 @@ ${formData.linksOneDrive || 'N/A'}
           archivo: binFilePath
         });
 
+        // Caso: mtime cambió pero MD5 no, y coincide con BASE -> compilación sin cambios
+        if (mtimeChanged && baseChecksumCurrent && md5Current === baseChecksumCurrent && !md5Changed) {
+          if (!checksumErrorShownRef.current) {
+            console.log('❌ CHECKSUMS IDÉNTICOS - mtime cambió pero MD5 igual al BASE');
+            setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
+            setCompilationDetected(false);
+            checksumErrorShownRef.current = true;
+          }
+        }
+
         if (md5Changed) {
           hasDetectedAnyChangeRef.current = true;
-          console.log('🔔 CAMBIO REAL DETECTADO - Nueva compilación confirmada');
+          console.log('🔔 CAMBIO DETECTADO - Compilación en progreso');
           console.log(`   MD5 anterior: ${lastMonitoredMd5Ref.current?.substring(0, 12)}`);
           console.log(`   MD5 actual: ${md5Current.substring(0, 12)}`);
-          console.log(`   MD5 BASE esperado: ${baseChecksumCurrent?.substring(0, 12)}`);
 
+          // Limpiar advertencias previas
           if (checksumErrorShownRef.current || checksumWarning) {
-            console.log('🔄 Nueva compilación detectada - reseteando mensajes previos');
             setChecksumWarning('');
           }
           checksumErrorShownRef.current = false;
-          setCompilationDetected(false);
-        }
 
-        if (baseChecksumCurrent && hasDetectedAnyChangeRef.current) {
-          if (md5Current === baseChecksumCurrent) {
-            if (!checksumErrorShownRef.current) {
-              console.log('❌ CHECKSUMS IDÉNTICOS - MD5 actual igual al BASE');
+          // Evaluar inmediatamente el estado vs BASE al detectar cambio
+          if (baseChecksumCurrent) {
+            if (md5Current === baseChecksumCurrent) {
+              console.log('❌ CHECKSUMS IDÉNTICOS - tras cambio de MD5');
               setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
               setCompilationDetected(false);
               checksumErrorShownRef.current = true;
-            }
-          } else {
-            if (!compilationDetected) {
-              console.log('✅ MD5 diferente al BASE - compilación válida detectada');
+            } else {
+              console.log('✅ MD5 diferente al BASE - compilación válida');
               console.log(`   BASE: ${baseChecksumCurrent.substring(0, 12)}, Actual: ${md5Current.substring(0, 12)}`);
               setChecksumWarning('');
               checksumErrorShownRef.current = false;
@@ -1341,6 +1346,29 @@ ${formData.linksOneDrive || 'N/A'}
                 clearInterval(checkFileIntervalRef.current);
                 checkFileIntervalRef.current = null;
               }
+            }
+          } else {
+            // Sin base conocida, no habilitar
+            setCompilationDetected(false);
+          }
+        } else if (hasDetectedAnyChangeRef.current && baseChecksumCurrent) {
+          // MD5 estable después de un cambio previo: reevaluar (por si el primer cambio coincidía con BASE)
+          if (md5Current === baseChecksumCurrent) {
+            if (!checksumErrorShownRef.current) {
+              console.log('❌ CHECKSUMS IDÉNTICOS - MD5 compilado igual al BASE');
+              setChecksumWarning('Los checksums son idénticos. Realice un "clean" y compile nuevamente.');
+              setCompilationDetected(false);
+              checksumErrorShownRef.current = true;
+            }
+          } else if (!compilationDetected) {
+            console.log('✅ MD5 diferente al BASE - compilación válida (estabilizado)');
+            console.log(`   BASE: ${baseChecksumCurrent.substring(0, 12)}, Actual: ${md5Current.substring(0, 12)}`);
+            setChecksumWarning('');
+            checksumErrorShownRef.current = false;
+            setCompilationDetected(true);
+            if (checkFileIntervalRef.current) {
+              clearInterval(checkFileIntervalRef.current);
+              checkFileIntervalRef.current = null;
             }
           }
         }
