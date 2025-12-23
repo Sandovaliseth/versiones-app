@@ -2,10 +2,10 @@ export type TipoDocumento = 'firma' | 'certificacion';
 export type TipoFirma = 'generica' | 'personalizada';
 
 export interface CrearVersionData {
-  // --- CAMPOS COMUNES (para FIRMA y CERTIFICACIÓN) ---
   cliente?: string;
-  nombreVersionCliente?: string; // ENLACEAV
+  nombreVersionCliente?: string;
   terminal?: string;
+  esDemo?: boolean;
   versionBase?: string;
   versionAumento?: string;
   build?: string;
@@ -15,7 +15,6 @@ export interface CrearVersionData {
   descripcionBreve?: string;
   rutaCompilacion?: string;
   rutaLocal?: string;
-  // Campos para compilación automática y checksums
   rutaProyecto?: string;
   archivoVersion?: string;
   nombreArchivoBin?: string;
@@ -27,28 +26,23 @@ export interface CrearVersionData {
   checksumBase?: string;
   checksumAumento?: string;
   
-  // --- CONTROL ---
   tipoDocumento: TipoDocumento;
   
-  // --- CAMPOS EXCLUSIVOS DE CERTIFICACIÓN ---
-  archivoPkg?: File; // Archivo .pkg para calcular checksum
+  archivoPkg?: File;
   nombrePkg?: string;
-  checksumPkg?: string; // Checksum calculado del archivo
-  checksumCorreo?: string; // Checksum recibido por correo para validar
+  checksumPkg?: string;
+  checksumCorreo?: string;
   linksOneDrive?: string;
   capturaEvidencia?: File;
-  formatoRelease?: File; // Documento/formato del release
-  // Campos para certificación con AUMENTO
+  formatoRelease?: File;
   nombrePkgBase?: string;
   checksumPkgBase?: string;
   nombrePkgAumento?: string;
   checksumPkgAumento?: string;
   
-  // --- METADATOS OPCIONALES ---
   responsable?: string;
   departamento?: string;
   notasTecnicas?: string;
-  // --- Mapping to drafted email subject (optional) - used so the app can map replies to versions
   outlookSubject?: string;
 }
 
@@ -82,6 +76,7 @@ export const initialFormData: CrearVersionData = {
   cliente: '',
   nombreVersionCliente: '',
   terminal: '',
+  esDemo: false,
   versionBase: '',
   versionAumento: '',
   incluirVersionAumento: false,

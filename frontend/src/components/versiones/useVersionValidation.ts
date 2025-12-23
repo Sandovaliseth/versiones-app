@@ -38,10 +38,14 @@ export const useVersionValidation = () => {
     const newErrors: ValidationErrors = {};
     const missingFields: (keyof CrearVersionData)[] = [];
     const formatErrors: (keyof CrearVersionData)[] = [];
+    const isDemo = Boolean(formData.esDemo);
     const requiredFields = camposRequeridos[formData.tipoDocumento];
 
     requiredFields.forEach((field) => {
       if (field === 'versionAumento' && formData.incluirVersionAumento === false) {
+        return;
+      }
+      if (isDemo && (field === 'versionBase' || field === 'versionAumento')) {
         return;
       }
       const key = field as keyof CrearVersionData;
@@ -53,6 +57,7 @@ export const useVersionValidation = () => {
     });
 
     (['versionBase', 'versionAumento', 'build'] as const).forEach((fieldKey) => {
+      if (isDemo && (fieldKey === 'versionBase' || fieldKey === 'versionAumento')) return;
       const value = formData[fieldKey];
       if (!value) return;
       const error = validateField(fieldKey, value);

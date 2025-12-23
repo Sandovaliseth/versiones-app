@@ -73,9 +73,9 @@ export const FieldGroup: React.FC<FieldGroupProps> = ({
   helper
 }) => (
   <div className="space-y-2">
-    <label className="flex items-center gap-2 font-body text-sm font-bold text-gray-900 dark:text-gray-100">
+    <label className="flex items-center gap-2 font-body text-sm font-bold text-gray-900 dark:text-gray-100 min-w-0">
       {icon}
-      {label}
+      <span className="min-w-0 truncate">{label}</span>
       {required && <span className="text-red-600 dark:text-red-400">*</span>}
     </label>
     {children}
@@ -225,7 +225,6 @@ export const SelectField: React.FC<SelectFieldProps> = ({
           className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
           animate={{ 
             rotate: isOpen ? 180 : 0,
-            y: isOpen ? '-45%' : '-50%',
             scale: isOpen ? 1.15 : 1
           }}
           transition={{ 

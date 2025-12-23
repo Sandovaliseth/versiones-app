@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   zipArtifacts: (options) => ipcRenderer.invoke('zip-artifacts', options),
   createOutlookDraft: (options) => ipcRenderer.invoke('create-outlook-draft', options),
   checkOutlookReplies: (options) => ipcRenderer.invoke('check-outlook-replies', options),
+  getDefaultVersionesPath: () => ipcRenderer.invoke('get-default-versiones-path'),
   // File watch API: start/stop native watchers and subscribe to events
   startFileWatch: (filePath) => ipcRenderer.invoke('start-file-watch', filePath),
   stopFileWatch: (watchId) => ipcRenderer.invoke('stop-file-watch', watchId),

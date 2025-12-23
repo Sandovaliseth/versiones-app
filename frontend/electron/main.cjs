@@ -111,11 +111,41 @@ function createWindow() {
   // En producción: cargar archivos compilados
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    // Abrir DevTools en desarrollo
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-    // En producción no abrir DevTools
+    const candidates = [
+      path.join(__dirname, '../dist/index.html'),
+      path.join(process.resourcesPath || '', 'app', 'dist', 'index.html'),
+      path.join(process.resourcesPath || '', 'dist', 'index.html'),
+      path.join(app.getAppPath(), 'dist', 'index.html')
+    ].filter(Boolean);
+
+    let loaded = false;
+    for (const candidate of candidates) {
+      try {
+        if (fs.existsSync(candidate)) {
+          console.log('📄 Cargando index.html desde:', candidate);
+          mainWindow.loadFile(candidate);
+          loaded = true;
+          break;
+        } else {
+          console.log('⚠️ No existe index.html en:', candidate);
+        }
+      } catch (e) {
+        console.warn('⚠️ Error verificando ruta:', candidate, e.message);
+      }
+    }
+
+    if (!loaded) {
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Error</title></head>
+        <body style="font-family:system-ui;padding:24px;">
+          <h2>❌ No se encontró index.html</h2>
+          <p>Se intentaron las siguientes rutas:</p>
+          <ul>${candidates.map(c => `<li>${c}</li>`).join('')}</ul>
+          <p>Verifica que el comando <code>npm run build</code> haya generado la carpeta <code>dist</code> y que esté incluida en el paquete.</p>
+        </body></html>`;
+      mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    }
   }
 
   // Mostrar ventana cuando esté lista para evitar flash blanco
@@ -124,6 +154,8 @@ function createWindow() {
     mainWindow.focus();
     // En algunas instalaciones de Windows, el menú puede ocultarse; forzar visibilidad
     try { mainWindow.setMenuBarVisibility(true); } catch (e) { /* ignore */ }
+    // Opcional: abrir DevTools si hay problemas de carga
+    try { if (!isDev) { /* mainWindow.webContents.openDevTools(); */ } } catch (e) { /* ignore */ }
   });
 
   // Timeout de seguridad: si no se muestra en 3s, forzar mostrar
@@ -325,10 +357,12 @@ if ($data.to) { $mail.To = $data.to }
 if ($data.saveToSent -eq $true) {
   $mail.SaveSentMessageFolder = $namespace.GetDefaultFolder(5)
 }
+$attachedCount = 0
 if ($data.attachments) {
   foreach ($att in $data.attachments) {
     if ($att -and (Test-Path $att)) {
       $mail.Attachments.Add($att) | Out-Null
+      $attachedCount++
     }
   }
 }
@@ -347,6 +381,7 @@ $result = [PSCustomObject]@{
   subject = $mail.Subject
   sent = $sent
   entryId = $mail.EntryID
+  attachedCount = $attachedCount
 }
 $result | ConvertTo-Json -Compress
 `);
@@ -354,6 +389,27 @@ $result | ConvertTo-Json -Compress
     return result || { ok: false, error: 'Sin respuesta de Outlook' };
   } catch (error) {
     return { ok: false, error: String(error) };
+  }
+});
+
+// Entregar una ruta base confiable para 'Versiones'
+ipcMain.handle('get-default-versiones-path', async () => {
+  try {
+    const os = require('os');
+    const home = os.homedir();
+    const candidates = [
+      path.join(home, 'OneDrive', 'Versiones'),
+      path.join(home, 'Documents', 'Versiones')
+    ];
+    // Elegir el primer candidato; crear si no existe
+    const base = candidates[0];
+    await ensureDirectory(base);
+    return base;
+  } catch (e) {
+    // Fallback al temp
+    const baseTemp = path.join(app.getPath('temp'), 'versiones-app', 'Versiones');
+    try { await ensureDirectory(baseTemp); } catch {}
+    return baseTemp;
   }
 });
 
@@ -724,30 +780,41 @@ ipcMain.handle('zip-artifacts', async (_event, payload = {}) => {
       return { ok: false, error: 'No se proporcionaron archivos a comprimir' };
     }
 
-    const existingFiles = candidateFiles.filter((filePath) => {
+    // Aceptar tanto archivos como carpetas; se agrega el contenido de carpetas recursivamente
+    const existingPaths = candidateFiles.filter((filePath) => {
       try {
-        return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+        return fs.existsSync(filePath);
       } catch {
         return false;
       }
     });
 
-    if (!existingFiles.length) {
-      return { ok: false, error: 'Ninguno de los archivos existe físicamente' };
+    if (!existingPaths.length) {
+      return { ok: false, error: 'Ninguna de las rutas existe físicamente' };
     }
 
     const baseTemp = path.join(app.getPath('temp'), 'versiones-app', subfolder ? sanitizeFilename(subfolder) : '');
     await ensureDirectory(baseTemp);
-    const targetName = sanitizeFilename(zipName || path.basename(existingFiles[0]) || `artefactos-${Date.now()}`);
+    const targetName = sanitizeFilename(zipName || path.basename(existingPaths[0]) || `artefactos-${Date.now()}`);
     const zipPath = path.join(baseTemp, targetName.endsWith('.zip') ? targetName : `${targetName}.zip`);
 
     const zip = new AdmZip();
-    for (const filePath of existingFiles) {
-      zip.addLocalFile(filePath);
+    for (const inputPath of existingPaths) {
+      try {
+        const st = fs.statSync(inputPath);
+        if (st.isDirectory()) {
+          // Preservar el nombre de la carpeta en el ZIP y agregar su contenido recursivamente
+          zip.addLocalFolder(inputPath, path.basename(inputPath));
+        } else if (st.isFile()) {
+          zip.addLocalFile(inputPath, '', path.basename(inputPath));
+        }
+      } catch (e) {
+        // Ignorar rutas problemáticas y continuar con las demás
+      }
     }
     zip.writeZip(zipPath);
 
-    return { ok: true, path: zipPath, files: existingFiles };
+    return { ok: true, path: zipPath, files: existingPaths };
   } catch (error) {
     return { ok: false, error: String(error) };
   }

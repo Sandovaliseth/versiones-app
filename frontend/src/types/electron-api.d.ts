@@ -21,6 +21,7 @@ declare global {
       captureScreenshot(options: { selector?: string; fileName?: string; outputPath?: string }): Promise<any>;
       createOutlookDraft(opts: ElectronCreateDraftOptions): Promise<any>;
       checkOutlookReplies(opts: { subjectContains?: string; sinceMinutes?: number; subjectKeyword?: string }): Promise<any>;
+      getDefaultVersionesPath(): Promise<string>;
       computeMd5(path: string): Promise<string>;
       getFileStat(path: string): Promise<{ ok: boolean; mtimeMs?: number; size?: number; error?: string }>;
       runCompilation(...args: any[]): Promise<any>;
